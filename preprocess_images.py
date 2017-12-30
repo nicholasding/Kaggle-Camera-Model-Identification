@@ -7,28 +7,70 @@ from PIL import Image
 train_folder = '/home/nicholas/Workspace/Resources/Camera/train'
 validation_folder = '/home/nicholas/Workspace/Resources/Camera/validation'
 
-def crop_split(filepath, grid_size=512):
+def resize_crop(im, ratio, grid_size=1024):
+    resized = im.resize((int(im.size[0] * ratio), int(im.size[1] * ratio)), Image.BICUBIC)
+
+    center_x = im.size[0] // 2
+    center_y = im.size[1] // 2
+
+    return resized.crop((center_x - grid_size // 2, center_y - grid_size // 2, center_x + grid_size // 2, center_y + grid_size // 2))
+
+def gamma_correction(im, gamma):
+    """
+    Fast gamma correction with PIL's image.point() method
+    """
+    invert_gamma = 1.0 / gamma
+    lut = [pow(x/255., invert_gamma) * 255 for x in range(256)]
+    lut = lut * 3 # need one set of data for each band for RGB
+    im = im.point(lut)
+    return im
+
+def crop_split(filepath, grid_size=1024):
+    """
+    JPEG compression with quality factor = 70
+    JPEG compression with quality factor = 90
+    resizing (via bicubic interpolation) by a factor of 0.5
+    resizing (via bicubic interpolation) by a factor of 0.8
+    resizing (via bicubic interpolation) by a factor of 1.5
+    resizing (via bicubic interpolation) by a factor of 2.0
+    gamma correction using gamma = 0.8
+    gamma correction using gamma = 1.2
+    """
     filename = os.path.basename(filepath)
     name, ext = filename.split('.')
-    print(name, ext)
+    dirname = os.path.dirname(filepath)
 
     im = Image.open(filepath)
     crops = []
 
-    for col in range(im.size[0] // grid_size):
-        for row in range(im.size[1] // grid_size):
-            x1 = col * grid_size
-            y1 = row * grid_size
-            x2 = x1 + grid_size
-            y2 = y1 + grid_size
-            
-            crops.append(im.crop((x1, y1, x2, y2)))
-    
-    dirname = os.path.dirname(filepath)
+    center_x = im.size[0] // 2
+    center_y = im.size[1] // 2
 
-    for idx, crop in enumerate(crops):
-        print('Saving', os.path.join(dirname, '.'.join([name, str(idx), ext])))
-        crop.save(os.path.join(dirname, '.'.join([name, str(idx), ext])))
+    centered_im = im.crop((center_x - grid_size // 2, center_y - grid_size // 2, center_x + grid_size // 2, center_y + grid_size // 2))
+
+    # Original
+    centered_im.save((os.path.join(dirname, '.'.join([name, 'centered', ext]))))
+
+    # JPEG compression
+    centered_im.save((os.path.join(dirname, '.'.join([name, 'jpeg70', ext]))), "JPEG", quality=70)
+    centered_im.save((os.path.join(dirname, '.'.join([name, 'jpeg90', ext]))), "JPEG", quality=90)
+
+    # Resize
+    resized_im = resize_crop(im, 0.5)
+    resized_im.save((os.path.join(dirname, '.'.join([name, 'r0.5', ext]))))
+    resized_im = resize_crop(im, 0.8)
+    resized_im.save((os.path.join(dirname, '.'.join([name, 'r0.8', ext]))))
+    resized_im = resize_crop(im, 1.5)
+    resized_im.save((os.path.join(dirname, '.'.join([name, 'r1.5', ext]))))
+    resized_im = resize_crop(im, 2.0)
+    resized_im.save((os.path.join(dirname, '.'.join([name, 'r2.0', ext]))))
+
+    # Gamma correction
+    corrected_im = gamma_correction(centered_im, 0.8)
+    corrected_im.save((os.path.join(dirname, '.'.join([name, 'g0.8', ext]))))
+    corrected_im = gamma_correction(centered_im, 1.2)
+    corrected_im.save((os.path.join(dirname, '.'.join([name, 'g1.2', ext]))))
+
 
 def batch_crop():
     # Walk into each directory and process the images
@@ -37,6 +79,7 @@ def batch_crop():
             print('Processing', folder, filename)
             crop_split(os.path.join(train_folder, folder, filename))
             os.remove(os.path.join(train_folder, folder, filename))
+
 
 def generate_validation_set():
     for folder in os.listdir(train_folder):
@@ -55,5 +98,6 @@ def generate_validation_set():
         for filename in validation_set:
             os.rename(os.path.join(train_folder, folder, filename), os.path.join(target_folder, filename))
 
-# batch_crop()
-generate_validation_set()
+
+batch_crop()
+# generate_validation_set()
