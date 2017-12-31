@@ -2,6 +2,7 @@ import math
 import os
 import random
 
+from multiprocessing import Process
 from PIL import Image
 
 train_folder = '/home/nicholas/Workspace/Resources/Camera/train'
@@ -10,8 +11,8 @@ validation_folder = '/home/nicholas/Workspace/Resources/Camera/validation'
 def resize_crop(im, ratio, grid_size=1024):
     resized = im.resize((int(im.size[0] * ratio), int(im.size[1] * ratio)), Image.BICUBIC)
 
-    center_x = im.size[0] // 2
-    center_y = im.size[1] // 2
+    center_x = resized.size[0] // 2
+    center_y = resized.size[1] // 2
 
     return resized.crop((center_x - grid_size // 2, center_y - grid_size // 2, center_x + grid_size // 2, center_y + grid_size // 2))
 
@@ -73,12 +74,22 @@ def crop_split(filepath, grid_size=1024):
 
 
 def batch_crop():
-    # Walk into each directory and process the images
-    for folder in os.listdir(train_folder):
+    def crop_in_folder(folder):
         for filename in os.listdir(os.path.join(train_folder, folder)):
             print('Processing', folder, filename)
             crop_split(os.path.join(train_folder, folder, filename))
             os.remove(os.path.join(train_folder, folder, filename))
+
+    # Walk into each directory and process the images
+    procs = []
+
+    for folder in os.listdir(train_folder):
+        p = Process(target=crop_in_folder, args=(folder,))
+        p.start()
+        procs.append(p)
+    
+    for proc in procs:
+        proc.join()
 
 
 def generate_validation_set():
