@@ -17,7 +17,8 @@ from keras.callbacks import ModelCheckpoint
 from keras import optimizers, utils
 from keras.layers.normalization import BatchNormalization
 
-IMAGE_SIZE = 256
+from config import IMAGE_SIZE, BATCH_SIZE
+
 
 list_classes = [
     'HTC-1-M7', 
@@ -40,6 +41,10 @@ def build_model(num_classes, input_shape):
     model.add(BatchNormalization())
     model.add(MaxPooling2D((2, 2)))
     
+    model.add(SeparableConv2D(32, (3, 3), activation='relu'))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D((2, 2)))
+
     model.add(SeparableConv2D(64, (3, 3), activation='relu'))
     model.add(BatchNormalization())
     model.add(MaxPooling2D((2, 2)))
@@ -59,7 +64,7 @@ def build_model(num_classes, input_shape):
     # Activation
     model.add(GlobalMaxPool2D())
     model.add(Dropout(0.5))
-    model.add(Dense(256, activation='relu'))
+    model.add(Dense(512, activation='relu'))
     model.add(Dense(num_classes, activation='softmax'))
     
     # Compile
@@ -103,27 +108,28 @@ def build_generator():
     #     zoom_range=0.2,
     #     horizontal_flip=True,
     #     fill_mode='nearest')
-    
+    train_folder = '/home/nicholas/Workspace/Resources/Camera'
+    batch_size = BATCH_SIZE
+
     generator = ImageDataGenerator()
 
-    return generator
+    train_generator = generator.flow_from_directory(os.path.join(train_folder, 'train'), target_size=(IMAGE_SIZE, IMAGE_SIZE), batch_size=batch_size)
+    validation_generator = generator.flow_from_directory(os.path.join(train_folder, 'validation'), target_size=(IMAGE_SIZE, IMAGE_SIZE), batch_size=batch_size)
+    
+    return train_generator, validation_generator
 
 
 def train_model():
-    train_folder = '/home/nicholas/Workspace/Resources/Camera'
-
     epochs = 1000
-    batch_size = 16
+    batch_size = BATCH_SIZE
 
-    checkpointer = ModelCheckpoint(filepath='saved_models/weights.best.camera.hdf5', verbose=1, save_best_only=True)
+    checkpointer = ModelCheckpoint(filepath='saved_models/weights.best.camera.hdf5', monitor='val_acc', verbose=1, save_best_only=True, mode='max')
     callbacks_list = [checkpointer]
 
     model = build_model(len(list_classes), (IMAGE_SIZE, IMAGE_SIZE, 3))
 
-    train_datagen = build_generator()
-    train_generator = train_datagen.flow_from_directory(os.path.join(train_folder, 'train'), target_size=(IMAGE_SIZE, IMAGE_SIZE), batch_size=batch_size)
-    validation_generator = train_datagen.flow_from_directory(os.path.join(train_folder, 'validation'), target_size=(IMAGE_SIZE, IMAGE_SIZE), batch_size=batch_size)
-
+    train_generator, validation_generator = build_generator()
+    
     generator = load_training_generator()
 
     model.fit_generator(train_generator,
