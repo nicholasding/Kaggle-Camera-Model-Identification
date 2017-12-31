@@ -110,5 +110,5 @@ def generate_validation_set():
             os.rename(os.path.join(train_folder, folder, filename), os.path.join(target_folder, filename))
 
 
-batch_crop()
-# generate_validation_set()
+# batch_crop()
+generate_validation_set()
