@@ -12,7 +12,7 @@ def build_generator(train_folder, batch_size, image_size):
     #     zoom_range=0.2,
     #     horizontal_flip=True,
     #     fill_mode='nearest')
-    generator = ImageDataGenerator()
+    generator = ImageDataGenerator(rescale=1. / 255)
 
     train_generator = generator.flow_from_directory(os.path.join(train_folder, 'train'), target_size=(image_size, image_size), batch_size=batch_size)
     validation_generator = generator.flow_from_directory(os.path.join(train_folder, 'validation'), target_size=(image_size, image_size), batch_size=batch_size)
@@ -32,11 +32,10 @@ def lr_schedule(epoch):
     lr = 1e-3
     if epoch > 180:
         lr *= 0.5e-3
-    elif epoch > 160:
+    elif epoch > 150:
         lr *= 1e-3
-    elif epoch > 120:
+    elif epoch > 100:
         lr *= 1e-2
-    elif epoch > 80:
+    elif epoch > 50:
         lr *= 1e-1
-    print('Learning rate: ', lr)
     return lr

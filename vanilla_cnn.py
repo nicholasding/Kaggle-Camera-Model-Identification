@@ -153,7 +153,7 @@ def predict():
         im = Image.open(os.path.join(test_folder, filename))
         resized = im.resize((IMAGE_SIZE, IMAGE_SIZE), Image.NORMAL)
         arr = np.array(resized)
-        y_hat = model.predict(np.array([arr]))
+        y_hat = model.predict(np.array([arr]) / 255)
         print(filename + "," + list_classes[y_hat[0].argmax()])
         # print(filename, y_hat)
 
