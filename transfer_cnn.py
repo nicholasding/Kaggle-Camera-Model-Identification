@@ -5,7 +5,7 @@ import os
 from PIL import Image
 from keras.layers import Dense, Conv2D, BatchNormalization, Activation
 from keras.layers import AveragePooling2D, Input, Flatten, GlobalAveragePooling2D, GlobalMaxPooling2D, Dropout
-from keras.optimizers import Adam, SGD, Adagrad
+from keras.optimizers import Adam, SGD, Adagrad, RMSprop
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler, ReduceLROnPlateau, EarlyStopping, TensorBoard
 from keras.preprocessing.image import ImageDataGenerator
 from keras.regularizers import l2
@@ -39,19 +39,22 @@ def build_model(num_classes):
 
     # Compile the model and freeze the pre-trained layers
     for layer in base_model.layers: layer.trainable = False
-    # sgd = SGD(lr=0.0002, decay=1e-6, momentum=0.9, nesterov=True)
+
+    # sgd = SGD(lr=0.00002, decay=1e-6, momentum=0.9, nesterov=True)
     # model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
     model.compile(optimizer=Adagrad(), loss='categorical_crossentropy', metrics=['accuracy'])
     # model.compile(optimizer=Adam(lr=lr_schedule(0)), loss='categorical_crossentropy', metrics=['accuracy'])
+    # model.compile(optimizer=RMSprop(lr=1e-5), loss='categorical_crossentropy', metrics=['accuracy'])
 
-    return model
+    return base_model, model
 
+MODEL_FILE = 'saved_models/weights.xfr.patches.best.camera.hdf5'
 
-def train_model():
+def train_model(load_weights=False):
     train_folder = '/home/nicholas/Workspace/Resources/Camera/patches'
     epochs = 10000
 
-    checkpointer = ModelCheckpoint(filepath='saved_models/weights.xfr.patches.best.camera.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+    checkpointer = ModelCheckpoint(filepath='saved_models/weights.xfr.patches.tuned.best.camera.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
     lr_scheduler = LearningRateScheduler(lr_schedule)
     # lr_reducer = ReduceLROnPlateau(factor=np.sqrt(0.1),
     #                            cooldown=0,
@@ -63,23 +66,28 @@ def train_model():
     callbacks_list = [checkpointer, TensorBoard()]
     # callbacks_list = [checkpointer, lr_reducer, early_stopping, TensorBoard()] # Adagrad doesn't need lr scheduler
 
-    model = build_model(len(list_classes))
+    base_model, model = build_model(len(list_classes))
+
+    if load_weights:
+        model.load_weights(MODEL_FILE)
+        for layer in base_model.layers[-26:]:
+            layer.trainable = True
 
     train_generator, validation_generator = build_generator(train_folder, BATCH_SIZE, IMAGE_SIZE)
 
     model.fit_generator(train_generator,
-                        steps_per_epoch=8000 // BATCH_SIZE,
+                        steps_per_epoch=10000 // BATCH_SIZE,
                         epochs=epochs,
                         validation_data=validation_generator,
-                        validation_steps=3000 // BATCH_SIZE,
+                        validation_steps=4000 // BATCH_SIZE,
                         callbacks=callbacks_list)
 
 
 def predict():
     test_folder = '/home/nicholas/Workspace/Resources/Camera/test'
 
-    model = build_model(len(list_classes))
-    model.load_weights('saved_models/weights.xfr.patches.best.camera.hdf5')
+    base_model, model = build_model(len(list_classes))
+    model.load_weights('saved_models/weights.xfr.patches.tuned.best.camera.hdf5')
 
     print('fname,camera')
 

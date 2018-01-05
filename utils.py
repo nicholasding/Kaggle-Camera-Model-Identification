@@ -14,8 +14,8 @@ def build_generator(train_folder, batch_size, image_size):
     #     fill_mode='nearest')
     generator = ImageDataGenerator(rescale=1. / 255)
 
-    train_generator = generator.flow_from_directory(os.path.join(train_folder, 'train'), target_size=(image_size, image_size), batch_size=batch_size)
-    validation_generator = generator.flow_from_directory(os.path.join(train_folder, 'validation'), target_size=(image_size, image_size), batch_size=batch_size)
+    train_generator = generator.flow_from_directory(os.path.join(train_folder, 'train'), target_size=(image_size, image_size), batch_size=batch_size, shuffle=True)
+    validation_generator = generator.flow_from_directory(os.path.join(train_folder, 'validation'), target_size=(image_size, image_size), batch_size=batch_size, shuffle=True)
     
     return train_generator, validation_generator
 
