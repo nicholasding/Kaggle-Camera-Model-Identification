@@ -29,17 +29,18 @@ def build_model(num_classes):
     x = GlobalAveragePooling2D()(x)
     x = Dense(512, activation='relu')(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.2)(x)
-    x = Dense(256, activation='relu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.2)(x)
+    x = Dropout(0.35)(x)
+    #x = Dense(128, activation='relu')(x)
+    #x = BatchNormalization()(x)
+    #x = Dropout(0.5)(x)
     outputs = Dense(len(list_classes), activation='softmax')(x)
 
     model = Model(inputs=base_model.input, outputs=outputs)
 
     # Compile the model and freeze the pre-trained layers
     for layer in base_model.layers: layer.trainable = False
-    # sgd = SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True)
+    # sgd = SGD(lr=0.0002, decay=1e-6, momentum=0.9, nesterov=True)
+    # model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
     model.compile(optimizer=Adagrad(), loss='categorical_crossentropy', metrics=['accuracy'])
     # model.compile(optimizer=Adam(lr=lr_schedule(0)), loss='categorical_crossentropy', metrics=['accuracy'])
 
@@ -57,18 +58,20 @@ def train_model():
     #                            patience=5,
     #                            min_lr=0.5e-6)
     lr_reducer = ReduceLROnPlateau(factor=0.1, patience=5)
-    early_stopping = EarlyStopping(patience=100)
+    early_stopping = EarlyStopping(patience=500)
 
-    callbacks_list = [checkpointer, lr_reducer, lr_scheduler, early_stopping, TensorBoard()]
+    callbacks_list = [checkpointer, TensorBoard()]
+    # callbacks_list = [checkpointer, lr_reducer, early_stopping, TensorBoard()] # Adagrad doesn't need lr scheduler
 
     model = build_model(len(list_classes))
 
     train_generator, validation_generator = build_generator(train_folder, BATCH_SIZE, IMAGE_SIZE)
 
     model.fit_generator(train_generator,
-                        steps_per_epoch=10000 // BATCH_SIZE, epochs=epochs,
+                        steps_per_epoch=8000 // BATCH_SIZE,
+                        epochs=epochs,
                         validation_data=validation_generator,
-                        validation_steps=5000 // BATCH_SIZE,
+                        validation_steps=3000 // BATCH_SIZE,
                         callbacks=callbacks_list)
 
 
@@ -88,5 +91,5 @@ def predict():
         print(filename + "," + list_classes[y_hat[0].argmax()])
 
 
-train_model()
-# predict()
+# train_model()
+predict()
