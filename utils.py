@@ -1,22 +1,37 @@
 import os
+import numpy as np
 
 from keras.preprocessing.image import ImageDataGenerator
 
 
 def build_generator(train_folder, batch_size, image_size):
-    # generator = ImageDataGenerator(rotation_range=40,
-    #     width_shift_range=0.2,
-    #     height_shift_range=0.2,
-    #     rescale=1./255,
-    #     shear_range=0.2,
-    #     zoom_range=0.2,
-    #     horizontal_flip=True,
-    #     fill_mode='nearest')
-    generator = ImageDataGenerator(rescale=1. / 255)
+    datagen_train = ImageDataGenerator(
+        horizontal_flip=True,
+        vertical_flip=True,
+        fill_mode='reflect',
+        rescale=1. / 255
+    )
 
-    train_generator = generator.flow_from_directory(os.path.join(train_folder, 'train'), target_size=(image_size, image_size), batch_size=batch_size, shuffle=True)
-    validation_generator = generator.flow_from_directory(os.path.join(train_folder, 'validation'), target_size=(image_size, image_size), batch_size=batch_size, shuffle=True)
-    
+    datagen_validation = ImageDataGenerator(
+        rescale=1. / 255
+    )
+
+    train_generator = datagen_train.flow_from_directory(
+        os.path.join(train_folder, 'train'),
+        target_size=(image_size, image_size),
+        batch_size=batch_size,
+        shuffle=True,
+        # random_crop=True
+    )
+
+    validation_generator = datagen_validation.flow_from_directory(
+        os.path.join(train_folder, 'validation'),
+        target_size=(image_size, image_size),
+        batch_size=batch_size,
+        shuffle=True,
+        # center_crop=True
+    )
+
     return train_generator, validation_generator
 
 
@@ -29,13 +44,14 @@ def lr_schedule(epoch):
     # Returns
         lr (float32): learning rate
     """
-    lr = 1e-4
-    if epoch > 180:
-        lr *= 0.5e-3
-    elif epoch > 150:
-        lr *= 1e-3
-    elif epoch > 100:
-        lr *= 1e-2
-    elif epoch > 50:
-        lr *= 1e-1
+    lr = 0.002
+    if epoch > 120:
+        lr *= 0.0001
+    elif epoch > 60:
+        lr *= 0.001
+    elif epoch > 30:
+        lr *= 0.01
+    elif epoch > 10:
+        lr *= 0.1 
+    
     return lr

@@ -1,6 +1,7 @@
 import math
 import os
 import random
+import numpy as np
 
 from multiprocessing import Process
 from PIL import Image
@@ -87,6 +88,19 @@ class BasePlan(object):
 
     def crop(self, image_file, output_folder):
         raise NotImplementedError
+
+
+class DefaultPlan(BasePlan):
+    """
+    Do not crop anything
+    """
+    def crop(self, filepath, output_folder):
+        filename = os.path.basename(filepath)
+        name, ext = filename.split('.')
+        dirname = os.path.dirname(filepath)
+
+        im = Image.open(filepath)
+        im.save(os.path.join(output_folder, '.'.join([name, 'original', ext])), 'JPEG', quality=100)
 
 
 class CenterPatchPlan(BasePlan):
@@ -188,8 +202,69 @@ class GridPatchPlan(BasePlan):
                 crop.save(os.path.join(output_folder, '%s.%d.%d.jpg' % (name, i, j)), 'JPEG', quality=100)
 
 
+class RandomPatchPlan(BasePlan):
+    """
+    Crop random patches but keep center patches for validation
+    """
+    PATCHES = 100
+
+    def random_crop(self, img, random_crop_size, sync_seed=None):
+        np.random.seed(sync_seed)
+        w, h = img.size[0], img.size[1]
+        rangew = (w - random_crop_size[0])
+        rangeh = (h - random_crop_size[1])
+        offsetw = 0 if rangew == 0 else np.random.randint(rangew)
+        offseth = 0 if rangeh == 0 else np.random.randint(rangeh)
+        return img.crop((offsetw, offseth, offsetw + random_crop_size[0], offseth + random_crop_size[1]))
+
+    def center_crop(self, img, center_crop_size):
+        center_w, center_h = img.size[0] // 2, img.size[1] // 2
+        half_w, half_h = center_crop_size[0] // 2, center_crop_size[1] // 2
+        return img.crop((center_w - half_w, center_h - half_h, center_w + half_w, center_h + half_h))
+
+    def crop(self, filepath, output_folder):
+        crop_size = 512
+
+        filename = os.path.basename(filepath)
+        name, ext = filename.split('.')
+        dirname = os.path.dirname(filepath)
+
+        im = Image.open(filepath)
+        col = im.size[0] // crop_size
+        row = im.size[1] // crop_size
+
+        # Random
+        for i in range(self.PATCHES):
+            crop = self.random_crop(im, (crop_size, crop_size))
+            # crop.save(os.path.join(output_folder, '%s.%d.jpg' % (name, i)), 'JPEG', quality=100)
+            crop.save(os.path.join(output_folder, '%s.%d.jpg' % (name, i)), 'JPEG')
+        
+        crop = self.center_crop(im, (crop_size, crop_size))
+        # crop.save(os.path.join(output_folder, '%s.center.jpg' % name), 'JPEG', quality=100)
+        crop.save(os.path.join(output_folder, '%s.center.jpg' % name), 'JPEG')
+
+    def generate_validation_set(self):
+        for folder in os.listdir(self.output_train):
+            files = [filename for filename in os.listdir(os.path.join(self.output_train, folder)) if 'center' in filename]
+            validation_set = random.sample(files, k=int(len(files) * VALIDATION_SPLIT))
+
+            print('Moving %d files out of %d' % (len(validation_set), len(files)))
+
+            assert len(validation_set) == len(set(validation_set))
+
+            # Create target folder
+            target_folder = os.path.join(self.output_val, folder)
+            if not os.path.exists(target_folder): os.mkdir(target_folder)
+
+            # Move files
+            for filename in validation_set:
+                os.rename(os.path.join(self.output_train, folder, filename), os.path.join(target_folder, filename))
+
+
 if __name__ == '__main__':
     train_folder = '/home/nicholas/Workspace/Resources/Camera/train'
     # plan = CenterPatchAugPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/center_patch')
-    plan = GridPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/patches')
+    # plan = GridPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/patches')
+    # plan = DefaultPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/default')
+    plan = RandomPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/LinuxDisk/random_patch')
     plan.start()
