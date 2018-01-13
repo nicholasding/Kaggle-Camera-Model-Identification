@@ -1,4 +1,4 @@
-BATCH_SIZE = 24
+BATCH_SIZE = 64
 IMAGE_SIZE = 512
 
 list_classes = [

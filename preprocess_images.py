@@ -46,7 +46,7 @@ class BasePlan(object):
         if not os.path.exists(self.output_val): os.mkdir(self.output_val)
     
     def start(self):
-        self.process_images()
+        # self.process_images()
         self.generate_validation_set()
     
     def process_images(self):
@@ -246,7 +246,7 @@ class RandomPatchPlan(BasePlan):
     def generate_validation_set(self):
         for folder in os.listdir(self.output_train):
             files = [filename for filename in os.listdir(os.path.join(self.output_train, folder)) if 'center' in filename]
-            validation_set = random.sample(files, k=int(len(files) * VALIDATION_SPLIT))
+            validation_set = files
 
             print('Moving %d files out of %d' % (len(validation_set), len(files)))
 
@@ -266,5 +266,5 @@ if __name__ == '__main__':
     # plan = CenterPatchAugPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/center_patch')
     # plan = GridPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/patches')
     # plan = DefaultPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/default')
-    plan = RandomPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/LinuxDisk/random_patch')
+    plan = RandomPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/random_patch')
     plan.start()

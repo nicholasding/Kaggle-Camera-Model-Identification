@@ -2,6 +2,8 @@ import os
 import numpy as np
 
 from keras.preprocessing.image import ImageDataGenerator
+from keras.callbacks import Callback
+from keras import backend as K
 
 
 def build_generator(train_folder, batch_size, image_size):
@@ -44,7 +46,7 @@ def lr_schedule(epoch):
     # Returns
         lr (float32): learning rate
     """
-    lr = 0.002
+    lr = 0.00000002
     if epoch > 120:
         lr *= 0.0001
     elif epoch > 60:
@@ -55,3 +57,11 @@ def lr_schedule(epoch):
         lr *= 0.1 
     
     return lr
+
+
+class LearningRateHistory(Callback):
+
+    def on_epoch_begin(self, batch, logs):
+        lr = K.get_value(self.model.optimizer.lr)
+        print('LR: %.2f' % lr)
+

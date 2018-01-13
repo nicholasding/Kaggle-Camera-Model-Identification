@@ -14,7 +14,7 @@ from keras.models import Model
 from keras.datasets import cifar10
 from keras.applications import ResNet50, InceptionV3, Xception
 
-from utils import build_generator, lr_schedule
+from utils import build_generator, lr_schedule, LearningRateHistory
 from config import BATCH_SIZE, IMAGE_SIZE, list_classes
 
 IMAGE_SIZE = 224
@@ -38,12 +38,12 @@ def build_model(num_classes, weights_file=None):
     model = Model(inputs=base_model.input, outputs=outputs)
 
     # Compile the model and freeze the pre-trained layers
-    for layer in base_model.layers[0:40]: layer.trainable = False
+    for layer in base_model.layers[0:30]: layer.trainable = False
 
     if weights_file:
         model.load_weights(weights_file)
-        for layer in base_model.layers[-20:]:
-            layer.trainable = True
+        # for layer in base_model.layers[-20:]:
+        #     layer.trainable = True
     
     sgd = SGD(lr=0.002, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
@@ -53,7 +53,6 @@ def build_model(num_classes, weights_file=None):
 
     return base_model, model
 
-MODEL_FILE = 'saved_models/weights.xfr.patches.best.camera.hdf5'
 
 def train_model(load_weights=False):
     train_folder = '/home/nicholas/Workspace/Resources/Camera/random_patch'
@@ -65,20 +64,22 @@ def train_model(load_weights=False):
     #                            cooldown=0,
     #                            patience=5,
     #                            min_lr=0.5e-6)
-    lr_reducer = ReduceLROnPlateau(factor=0.1, patience=3)
-    early_stopping = EarlyStopping(patience=100)
+    lr_reducer = ReduceLROnPlateau(factor=0.1, patience=5)
+    early_stopping = EarlyStopping(patience=25)
 
-    callbacks_list = [checkpointer, lr_scheduler, early_stopping, TensorBoard()]
+    callbacks_list = [checkpointer, lr_reducer, early_stopping, TensorBoard()]
     # callbacks_list = [checkpointer, lr_reducer, early_stopping, TensorBoard()] # Adagrad doesn't need lr scheduler
 
-    # base_model, model = build_model(len(list_classes), MODEL_FILE)
-    base_model, model = build_model(len(list_classes))
+    if load_weights:
+        base_model, model = build_model(len(list_classes), MODEL_FILE)
+    else:
+        base_model, model = build_model(len(list_classes))
     model.summary()
 
     train_generator, validation_generator = build_generator(train_folder, BATCH_SIZE, IMAGE_SIZE)
 
     model.fit_generator(train_generator,
-                        steps_per_epoch=5000 // BATCH_SIZE,
+                        steps_per_epoch=10000 // BATCH_SIZE,
                         epochs=epochs,
                         validation_data=validation_generator,
                         validation_steps=4000 // BATCH_SIZE,
@@ -102,5 +103,7 @@ def predict():
         print(filename + "," + list_classes[y_hat[0].argmax()])
 
 
-#train_model(load_weights=False)
+MODEL_FILE = 'saved_models/weights.xfr.random_load.best.camera.hdf5'
+
+# train_model(load_weights=False)
 predict()
