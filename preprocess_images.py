@@ -46,7 +46,7 @@ class BasePlan(object):
         if not os.path.exists(self.output_val): os.mkdir(self.output_val)
     
     def start(self):
-        # self.process_images()
+        self.process_images()
         self.generate_validation_set()
     
     def process_images(self):
@@ -206,7 +206,7 @@ class RandomPatchPlan(BasePlan):
     """
     Crop random patches but keep center patches for validation
     """
-    PATCHES = 100
+    PATCHES = 300
 
     def random_crop(self, img, random_crop_size, sync_seed=None):
         np.random.seed(sync_seed)
@@ -240,8 +240,27 @@ class RandomPatchPlan(BasePlan):
             crop.save(os.path.join(output_folder, '%s.%d.jpg' % (name, i)), 'JPEG')
         
         crop = self.center_crop(im, (crop_size, crop_size))
-        # crop.save(os.path.join(output_folder, '%s.center.jpg' % name), 'JPEG', quality=100)
-        crop.save(os.path.join(output_folder, '%s.center.jpg' % name), 'JPEG')
+        crop.save(os.path.join(output_folder, '%s.center.jpg' % name), 'JPEG', quality=100)
+        crop.save(os.path.join(output_folder, '%s.center.jpep90.jpg' % name), 'JPEG', quality=90)
+        crop.save(os.path.join(output_folder, '%s.center.jpeg70.jpg' % name), 'JPEG', quality=70)
+        
+        # Enlarge validation set
+        # Resize
+        resized_im = resize_crop(im, 0.5)
+        resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r0.5', ext])), 'JPEG', quality=100)
+        resized_im = resize_crop(im, 0.8)
+        resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r0.8', ext])), 'JPEG', quality=100)
+        resized_im = resize_crop(im, 1.5)
+        resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r1.5', ext])), 'JPEG', quality=100)
+        resized_im = resize_crop(im, 2.0)
+        resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r2.0', ext])), 'JPEG', quality=100)
+
+        # Gamma correction
+        corrected_im = gamma_correction(crop, 0.8)
+        corrected_im.save(os.path.join(output_folder, '.'.join([name, 'center.g0.8', ext])), 'JPEG', quality=100)
+        corrected_im = gamma_correction(crop, 1.2)
+        corrected_im.save(os.path.join(output_folder, '.'.join([name, 'center.g1.2', ext])), 'JPEG', quality=100)
+
 
     def generate_validation_set(self):
         for folder in os.listdir(self.output_train):
@@ -262,9 +281,9 @@ class RandomPatchPlan(BasePlan):
 
 
 if __name__ == '__main__':
-    train_folder = '/home/nicholas/Workspace/Resources/Camera/train'
+    train_folder = '/home/nicholas/Workspace/Resources/LinuxDisk/Resources/Camera/train'
     # plan = CenterPatchAugPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/center_patch')
     # plan = GridPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/patches')
     # plan = DefaultPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/default')
-    plan = RandomPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/random_patch')
+    plan = RandomPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/LinuxDisk/Resources/Camera/random_patch')
     plan.start()

@@ -8,9 +8,9 @@ from keras import backend as K
 
 def build_generator(train_folder, batch_size, image_size):
     datagen_train = ImageDataGenerator(
-        horizontal_flip=True,
-        vertical_flip=True,
-        fill_mode='reflect',
+        # horizontal_flip=True,
+        # vertical_flip=True,
+        # fill_mode='reflect',
         rescale=1. / 255
     )
 

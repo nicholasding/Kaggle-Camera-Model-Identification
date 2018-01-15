@@ -45,7 +45,7 @@ def build_model(num_classes, weights_file=None):
         # for layer in base_model.layers[-20:]:
         #     layer.trainable = True
     
-    sgd = SGD(lr=0.002, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = SGD(lr=0.00002, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
     # model.compile(optimizer=Adagrad(), loss='categorical_crossentropy', metrics=['accuracy'])
     # model.compile(optimizer=Adam(lr=lr_schedule(0)), loss='categorical_crossentropy', metrics=['accuracy'])
@@ -55,7 +55,7 @@ def build_model(num_classes, weights_file=None):
 
 
 def train_model(load_weights=False):
-    train_folder = '/home/nicholas/Workspace/Resources/Camera/random_patch'
+    train_folder = '/media/nicholas/LinuxDisk/Resources/Camera/random_patch' # '/home/nicholas/Workspace/Resources/Camera/random_patch'
     epochs = 10000
 
     checkpointer = ModelCheckpoint(filepath='saved_models/weights.xfr.random.best.camera.hdf5', monitor='val_loss', verbose=1, save_best_only=True, mode='min')
@@ -99,11 +99,11 @@ def predict():
         im = Image.open(os.path.join(test_folder, filename))
         resized = im.resize((IMAGE_SIZE, IMAGE_SIZE), Image.BICUBIC)
         arr = np.array(resized)
-        y_hat = model.predict(np.array([arr]) / 255)
+        y_hat = model.predict(np.array([arr]) / 255.0)
         print(filename + "," + list_classes[y_hat[0].argmax()])
 
 
 MODEL_FILE = 'saved_models/weights.xfr.random_load.best.camera.hdf5'
 
-# train_model(load_weights=False)
+# train_model(load_weights=True)
 predict()
