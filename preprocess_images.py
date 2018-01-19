@@ -55,7 +55,11 @@ class BasePlan(object):
                 output_folder = os.path.join(self.output_train, folder)
                 if not os.path.exists(output_folder): os.mkdir(output_folder)
                 print('Processing', folder, filename)
-                self.crop(os.path.join(self.train_folder, folder, filename), output_folder)
+                try:
+                    self.crop(os.path.join(self.train_folder, folder, filename), output_folder)
+                except Exception as error:
+                    print('Error in processing', error)
+                    
                 # os.remove(os.path.join(self.train_folder, folder, filename))
         
         # Walk into each directory and process the images
@@ -206,7 +210,7 @@ class RandomPatchPlan(BasePlan):
     """
     Crop random patches but keep center patches for validation
     """
-    PATCHES = 300
+    PATCHES = 100
 
     def random_crop(self, img, random_crop_size, sync_seed=None):
         np.random.seed(sync_seed)
@@ -223,7 +227,7 @@ class RandomPatchPlan(BasePlan):
         return img.crop((center_w - half_w, center_h - half_h, center_w + half_w, center_h + half_h))
 
     def crop(self, filepath, output_folder):
-        crop_size = 512
+        crop_size = 299 # InceptionResNetV2
 
         filename = os.path.basename(filepath)
         name, ext = filename.split('.')
@@ -237,7 +241,7 @@ class RandomPatchPlan(BasePlan):
         for i in range(self.PATCHES):
             crop = self.random_crop(im, (crop_size, crop_size))
             # crop.save(os.path.join(output_folder, '%s.%d.jpg' % (name, i)), 'JPEG', quality=100)
-            crop.save(os.path.join(output_folder, '%s.%d.jpg' % (name, i)), 'JPEG')
+            crop.save(os.path.join(output_folder, '%s.%d.jpg' % (name, i)), 'JPEG', quality=100)
         
         crop = self.center_crop(im, (crop_size, crop_size))
         crop.save(os.path.join(output_folder, '%s.center.jpg' % name), 'JPEG', quality=100)
@@ -246,13 +250,13 @@ class RandomPatchPlan(BasePlan):
         
         # Enlarge validation set
         # Resize
-        resized_im = resize_crop(im, 0.5)
+        resized_im = resize_crop(im, 0.5, grid_size=crop_size)
         resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r0.5', ext])), 'JPEG', quality=100)
-        resized_im = resize_crop(im, 0.8)
+        resized_im = resize_crop(im, 0.8, grid_size=crop_size)
         resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r0.8', ext])), 'JPEG', quality=100)
-        resized_im = resize_crop(im, 1.5)
+        resized_im = resize_crop(im, 1.5, grid_size=crop_size)
         resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r1.5', ext])), 'JPEG', quality=100)
-        resized_im = resize_crop(im, 2.0)
+        resized_im = resize_crop(im, 2.0, grid_size=crop_size)
         resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r2.0', ext])), 'JPEG', quality=100)
 
         # Gamma correction
@@ -281,7 +285,7 @@ class RandomPatchPlan(BasePlan):
 
 
 if __name__ == '__main__':
-    train_folder = '/home/nicholas/Workspace/Resources/LinuxDisk/Resources/Camera/train'
+    train_folder = '/home/nicholas/Workspace/Resources/LinuxDisk/Resources/Camera/train_merged'
     # plan = CenterPatchAugPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/center_patch')
     # plan = GridPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/patches')
     # plan = DefaultPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/default')
