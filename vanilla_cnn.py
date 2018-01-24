@@ -39,32 +39,35 @@ def build_model(num_classes, input_shape):
     # Conv layers
     model.add(SeparableConv2D(32, (3, 3), activation='relu', input_shape=input_shape))
     model.add(BatchNormalization())
-    model.add(MaxPooling2D((2, 2)))
+    # model.add(MaxPooling2D((2, 2)))
     
     model.add(SeparableConv2D(32, (3, 3), activation='relu'))
     model.add(BatchNormalization())
-    model.add(MaxPooling2D((2, 2)))
+    # model.add(MaxPooling2D((2, 2)))
 
-    model.add(SeparableConv2D(64, (3, 3), activation='relu'))
-    model.add(BatchNormalization())
-    model.add(MaxPooling2D((2, 2)))
+    # model.add(SeparableConv2D(64, (3, 3), activation='relu'))
+    # model.add(BatchNormalization())
+    # model.add(MaxPooling2D((2, 2)))
 
-    model.add(SeparableConv2D(64, (3, 3), activation='relu'))
-    model.add(BatchNormalization())
-    model.add(MaxPooling2D((2, 2)))
+    # model.add(SeparableConv2D(64, (3, 3), activation='relu'))
+    # model.add(BatchNormalization())
+    # model.add(MaxPooling2D((2, 2)))
     
-    model.add(SeparableConv2D(128, (3, 3), activation='relu'))
-    model.add(BatchNormalization())
-    model.add(MaxPooling2D((2, 2)))
+    # model.add(SeparableConv2D(128, (3, 3), activation='relu'))
+    # model.add(BatchNormalization())
+    # model.add(MaxPooling2D((2, 2)))
 
-    model.add(SeparableConv2D(256, (3, 3), activation='relu'))
-    model.add(BatchNormalization())
-    model.add(MaxPooling2D((2, 2)))
+    # model.add(SeparableConv2D(256, (3, 3), activation='relu'))
+    # model.add(BatchNormalization())
+    # model.add(MaxPooling2D((2, 2)))
 
     # Activation
     model.add(GlobalMaxPool2D())
     model.add(Dropout(0.5))
+    model.add(Dense(256, activation='relu'))
+    model.add(Dropout(0.5))
     model.add(Dense(512, activation='relu'))
+    model.add(Dropout(0.5))
     model.add(Dense(num_classes, activation='softmax'))
     
     # Compile

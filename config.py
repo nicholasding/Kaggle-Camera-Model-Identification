@@ -1,5 +1,5 @@
-BATCH_SIZE = 64 
-IMAGE_SIZE = 299 
+BATCH_SIZE = 32
+IMAGE_SIZE = 224 
 
 list_classes = [
     'HTC-1-M7', 

@@ -5,12 +5,13 @@ import numpy as np
 
 from multiprocessing import Process
 from PIL import Image
+from keras.preprocessing.image import load_img
 
 
 validation_folder = '/home/nicholas/Workspace/Resources/Camera/validation'
 
-VALIDATION_SPLIT = 0.4
-CROP_SIZE = 512
+VALIDATION_SPLIT = 0.2
+CROP_SIZE = 224
 
 
 def resize_crop(im, ratio, grid_size=CROP_SIZE):
@@ -47,7 +48,7 @@ class BasePlan(object):
     
     def start(self):
         self.process_images()
-        self.generate_validation_set()
+        # self.generate_validation_set()
     
     def process_images(self):
         def crop_in_folder(folder):
@@ -116,7 +117,7 @@ class CenterPatchPlan(BasePlan):
         name, ext = filename.split('.')
         dirname = os.path.dirname(filepath)
 
-        im = Image.open(filepath)
+        im = load_img(filepath)
 
         center_x = im.size[0] // 2
         center_y = im.size[1] // 2
@@ -124,7 +125,8 @@ class CenterPatchPlan(BasePlan):
         centered_im = im.crop((center_x - self.grid_size // 2, center_y - self.grid_size // 2, center_x + self.grid_size // 2, center_y + self.grid_size // 2))
 
         # Original
-        centered_im.save(os.path.join(output_folder, '.'.join([name, 'centered', ext])), 'JPEG', quality=100)
+        ext = 'png'
+        centered_im.save(os.path.join(output_folder, '.'.join([name, 'centered', ext])), 'PNG')
 
 
 class CenterPatchAugPlan(BasePlan):
@@ -212,11 +214,11 @@ class RandomPatchPlan(BasePlan):
     """
     PATCHES = 100
 
-    def random_crop(self, img, random_crop_size, sync_seed=None):
+    def random_crop(self, img, random_crop_size, ratio=1.0, sync_seed=None):
         np.random.seed(sync_seed)
         w, h = img.size[0], img.size[1]
-        rangew = (w - random_crop_size[0])
-        rangeh = (h - random_crop_size[1])
+        rangew = (w - random_crop_size[0] * ratio)
+        rangeh = (h - random_crop_size[1] * ratio)
         offsetw = 0 if rangew == 0 else np.random.randint(rangew)
         offseth = 0 if rangeh == 0 else np.random.randint(rangeh)
         return img.crop((offsetw, offseth, offsetw + random_crop_size[0], offseth + random_crop_size[1]))
@@ -227,7 +229,7 @@ class RandomPatchPlan(BasePlan):
         return img.crop((center_w - half_w, center_h - half_h, center_w + half_w, center_h + half_h))
 
     def crop(self, filepath, output_folder):
-        crop_size = 299 # InceptionResNetV2
+        crop_size = 224 # ResNet50
 
         filename = os.path.basename(filepath)
         name, ext = filename.split('.')
@@ -237,11 +239,25 @@ class RandomPatchPlan(BasePlan):
         col = im.size[0] // crop_size
         row = im.size[1] // crop_size
 
-        # Random
-        for i in range(self.PATCHES):
+        # Random Patches
+        for i in range(self.PATCHES * 3):
             crop = self.random_crop(im, (crop_size, crop_size))
-            # crop.save(os.path.join(output_folder, '%s.%d.jpg' % (name, i)), 'JPEG', quality=100)
-            crop.save(os.path.join(output_folder, '%s.%d.jpg' % (name, i)), 'JPEG', quality=100)
+            crop.save(os.path.join(output_folder, '%s.%d.jpg' % (name, i)), 'JPEG')
+        
+        # Random Patches with transformation
+        for i in range(self.PATCHES // 3):
+            ratio = np.random.choice([0.5, 0.8, 1.5, 2.0])
+            quality = np.random.choice([70, 90, 100])
+            crop = self.random_crop(im, (crop_size * ratio, crop_size * ratio))
+            crop = crop.resize((crop_size, crop_size), Image.BICUBIC)
+            crop.save(os.path.join(output_folder, '%s.%d.jpg' % (name, i)), 'JPEG', quality=int(quality))
+        
+        # Random Gamma Correction
+        for i in range(self.PATCHES // 3):
+            gamma = np.random.choice([0.8, 1.2])
+            crop = self.random_crop(im, (crop_size, crop_size))
+            corrected = gamma_correction(crop, gamma)
+            corrected.save(os.path.join(output_folder, '%s.g%d.jpg' % (name, i)), 'JPEG')
         
         crop = self.center_crop(im, (crop_size, crop_size))
         crop.save(os.path.join(output_folder, '%s.center.jpg' % name), 'JPEG', quality=100)
@@ -250,44 +266,46 @@ class RandomPatchPlan(BasePlan):
         
         # Enlarge validation set
         # Resize
+        ext = 'jpg'
         resized_im = resize_crop(im, 0.5, grid_size=crop_size)
-        resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r0.5', ext])), 'JPEG', quality=100)
+        resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r0.5', ext])), 'JPEG')
         resized_im = resize_crop(im, 0.8, grid_size=crop_size)
-        resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r0.8', ext])), 'JPEG', quality=100)
+        resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r0.8', ext])), 'JPEG')
         resized_im = resize_crop(im, 1.5, grid_size=crop_size)
-        resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r1.5', ext])), 'JPEG', quality=100)
+        resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r1.5', ext])), 'JPEG')
         resized_im = resize_crop(im, 2.0, grid_size=crop_size)
-        resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r2.0', ext])), 'JPEG', quality=100)
+        resized_im.save(os.path.join(output_folder, '.'.join([name, 'center.r2.0', ext])), 'JPEG')
 
         # Gamma correction
         corrected_im = gamma_correction(crop, 0.8)
-        corrected_im.save(os.path.join(output_folder, '.'.join([name, 'center.g0.8', ext])), 'JPEG', quality=100)
+        corrected_im.save(os.path.join(output_folder, '.'.join([name, 'center.g0.8', ext])), 'TIFF', compression='None')
         corrected_im = gamma_correction(crop, 1.2)
-        corrected_im.save(os.path.join(output_folder, '.'.join([name, 'center.g1.2', ext])), 'JPEG', quality=100)
+        corrected_im.save(os.path.join(output_folder, '.'.join([name, 'center.g1.2', ext])), 'TIFF', compression='None')
 
 
-    def generate_validation_set(self):
-        for folder in os.listdir(self.output_train):
-            files = [filename for filename in os.listdir(os.path.join(self.output_train, folder)) if 'center' in filename]
-            validation_set = files
+    # def generate_validation_set(self):
+    #     for folder in os.listdir(self.output_train):
+    #         files = [filename for filename in os.listdir(os.path.join(self.output_train, folder)) if 'center' in filename]
+    #         validation_set = files
 
-            print('Moving %d files out of %d' % (len(validation_set), len(files)))
+    #         print('Moving %d files out of %d' % (len(validation_set), len(files)))
 
-            assert len(validation_set) == len(set(validation_set))
+    #         assert len(validation_set) == len(set(validation_set))
 
-            # Create target folder
-            target_folder = os.path.join(self.output_val, folder)
-            if not os.path.exists(target_folder): os.mkdir(target_folder)
+    #         # Create target folder
+    #         target_folder = os.path.join(self.output_val, folder)
+    #         if not os.path.exists(target_folder): os.mkdir(target_folder)
 
-            # Move files
-            for filename in validation_set:
-                os.rename(os.path.join(self.output_train, folder, filename), os.path.join(target_folder, filename))
+    #         # Move files
+    #         for filename in validation_set:
+    #             os.rename(os.path.join(self.output_train, folder, filename), os.path.join(target_folder, filename))
 
 
 if __name__ == '__main__':
-    train_folder = '/home/nicholas/Workspace/Resources/LinuxDisk/Resources/Camera/train_merged'
+    train_folder = '/media/nicholas/Data/Resources/Camera/train_merged'
+    plan = CenterPatchPlan(train_folder, '/media/nicholas/Data/Resources/Camera/center_merged_val')
     # plan = CenterPatchAugPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/center_patch')
     # plan = GridPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/patches')
     # plan = DefaultPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/default')
-    plan = RandomPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/LinuxDisk/Resources/Camera/random_patch')
+    # plan = RandomPatchPlan(train_folder, '/media/nicholas/Data/Resources/Camera/merged_patches_1')
     plan.start()

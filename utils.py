@@ -4,14 +4,15 @@ import numpy as np
 from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import Callback
 from keras import backend as K
+from config import IMAGE_SIZE
 
 
 def build_generator(train_folder, batch_size, image_size):
     datagen_train = ImageDataGenerator(
         horizontal_flip=True,
         vertical_flip=True,
-        zoom_range=0.2,
-        fill_mode='reflect',
+        # zoom_range=0.2,
+        # fill_mode='reflect',
         rescale=1. / 255
     )
 
@@ -21,7 +22,7 @@ def build_generator(train_folder, batch_size, image_size):
 
     train_generator = datagen_train.flow_from_directory(
         os.path.join(train_folder, 'train'),
-        target_size=(299, 299),
+        target_size=(image_size, image_size),
         batch_size=batch_size,
         shuffle=True,
         # random_crop=True
@@ -29,7 +30,7 @@ def build_generator(train_folder, batch_size, image_size):
 
     validation_generator = datagen_validation.flow_from_directory(
         os.path.join(train_folder, 'validation'),
-        target_size=(299, 299),
+        target_size=(image_size, image_size),
         batch_size=batch_size,
         shuffle=True,
         # center_crop=True
@@ -44,28 +45,6 @@ def build_test_generator(test_folder, batch_size, image_size):
                         target_size=(image_size, image_size),
                         batch_size=batch_size,
                         shuffle=True)
-
-
-def lr_schedule(epoch):
-    """Learning Rate Schedule
-    Learning rate is scheduled to be reduced after 80, 120, 160, 180 epochs.
-    Called automatically every epoch as part of callbacks during training.
-    # Arguments
-        epoch (int): The number of epochs
-    # Returns
-        lr (float32): learning rate
-    """
-    lr = 0.00000002
-    if epoch > 120:
-        lr *= 0.0001
-    elif epoch > 60:
-        lr *= 0.001
-    elif epoch > 30:
-        lr *= 0.01
-    elif epoch > 10:
-        lr *= 0.1 
-    
-    return lr
 
 
 INITIAL_RATE = 0.002
