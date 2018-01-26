@@ -142,7 +142,7 @@ def train_model(base_name=False):
     epochs = 500
 
     checkpointer = ModelCheckpoint(filepath='saved_models/weights.%s.base.hdf5' % base_name, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
-    early_stopping = EarlyStopping(patience=20)
+    early_stopping = EarlyStopping(patience=99)
     lr_reducer = ReduceLROnPlateau(factor=0.3, patience=10)
 
     callbacks_list = [checkpointer, LearningRateScheduler(lr_schedule), early_stopping, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
@@ -167,13 +167,13 @@ def train_model(base_name=False):
                         verbose=1)
 
 
-def fine_tune(model, output_file, epochs=200):
+def fine_tune(model, output_file, epochs=500):
     base_model, model = build_model(len(list_classes), weights_file=model)
 
     # Unfreeze the n last layers for fine tuning
     for layer in base_model.layers: layer.trainable = True
 
-    model.compile(optimizer=Adam(lr=0.00001), loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=Adam(lr=0.0003), loss='categorical_crossentropy', metrics=['accuracy'])
 
     # Training
     train_folder = '/media/nicholas/Data/Resources/Camera/train'
@@ -186,7 +186,7 @@ def fine_tune(model, output_file, epochs=200):
         mode='min')
     
     # Callbacks
-    early_stopping = EarlyStopping(patience=20)
+    early_stopping = EarlyStopping(patience=99)
     lr_reducer = ReduceLROnPlateau(factor=0.3, patience=10)
     callbacks_list = [checkpointer, early_stopping, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
     
@@ -201,7 +201,7 @@ def fine_tune(model, output_file, epochs=200):
                         callbacks=callbacks_list,
                         use_multiprocessing=True, workers=4,
                         verbose=1,
-                        initial_epoch=94)
+                        initial_epoch=100)
 
 
 def evaluate(model, test_folder):
@@ -253,7 +253,7 @@ def predict(model, average=False):
             print(filename + "," + list_classes[y_hat.argmax()])
         else:
             img = load_img(os.path.join(test_folder, filename))
-            img = center_crop(img, (IMAGE_SIZE, IMAGE_SIZE))
+            # img = center_crop(img, (IMAGE_SIZE, IMAGE_SIZE))
             arr = img_to_array(img) / 255.
             y_hat = model.predict(np.asarray([arr], dtype=np.float32))
             print(filename + "," + list_classes[y_hat[0].argmax()])
@@ -264,8 +264,8 @@ if __name__ == '__main__':
     if cmd == 'train':
         train_model(base_name='resnet_s')
     elif cmd == 'tune':
-        fine_tune(model='saved_models/weights.resnet_s.base.hdf5', output_file='saved_models/weights.finetune.resnet_s.hdf5')
+        fine_tune(model='saved_models/weights.finetune.resnet_s.hdf5.LB.884', output_file='saved_models/weights.finetune.resnet_s.hdf5')
     elif cmd == 'predict':
-        predict(model=sys.argv[2], average=True)
+        predict(model=sys.argv[2], average=False)
     elif cmd == 'eval':
         evaluate(model=sys.argv[2], test_folder='/media/nicholas/Data/Resources/Camera/random_patch/test')
