@@ -17,12 +17,11 @@ CROP_SIZE = IMAGE_SIZE
 
 class BasePlan(object):
     
-    def __init__(self, train_folder, output_folder):
+    def __init__(self, train_folder, output_folder, grid_size=CROP_SIZE):
         self.train_folder = train_folder
         self.output_train = os.path.join(output_folder, 'train')
         self.output_val = os.path.join(output_folder, 'validation')
-
-        self.grid_size = CROP_SIZE
+        self.grid_size = grid_size
 
         if not os.path.exists(output_folder): os.mkdir(output_folder)
         if not os.path.exists(self.output_train): os.mkdir(self.output_train)
@@ -289,7 +288,7 @@ class RandomPatchPlan(BasePlan):
 
 if __name__ == '__main__':
     train_folder = '/media/nicholas/Data/Resources/Camera/train'
-    plan = CenterPatchPlan(train_folder, '/media/nicholas/Data/Resources/Camera/center_val_final')
+    plan = CenterPatchPlan(train_folder, '/media/nicholas/Data/Resources/Camera/center_val_final_512')
     # plan = CenterPatchAugPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/center_patch')
     # plan = GridPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/patches')
     # plan = DefaultPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/default')

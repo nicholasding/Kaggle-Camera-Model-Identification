@@ -1,5 +1,5 @@
-BATCH_SIZE = 32
-IMAGE_SIZE = 224 
+BATCH_SIZE = 10
+IMAGE_SIZE = 512 # 224 for ResNet50
 
 list_classes = [
     'HTC-1-M7', 

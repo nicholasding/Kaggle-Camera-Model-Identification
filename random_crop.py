@@ -5,7 +5,7 @@ import random
 from io import BytesIO
 from skimage import exposure
 from PIL import Image
-from config import list_classes, BATCH_SIZE
+from config import list_classes, BATCH_SIZE, IMAGE_SIZE
 from keras.utils import to_categorical, Sequence
 from keras.preprocessing.image import load_img
 from collections import defaultdict
@@ -35,7 +35,7 @@ class RandomCropSequence(Sequence):
         return 10000000
     
     def __getitem__(self, idx):
-        crop_size = 224
+        crop_size = IMAGE_SIZE
         num_classes = len(list_classes)
 
         X, y = [], []
@@ -65,7 +65,12 @@ class RandomCropSequence(Sequence):
                     X.append(np.asarray(crop, dtype=np.float32))
                     y.append(idx)
         
-        return (np.asarray(X, dtype=np.float32) / 255., to_categorical(y, len(list_classes)))
+        if crop_size > 224:
+            # To overcome GPU memory limit, divide the batch into two
+            for i in range(2):
+                return (np.asarray(X[i*5:(i+1)*5], dtype=np.float32) / 255., to_categorical(y[i*5:(i+1)*5], len(list_classes)))
+        else:
+            return (np.asarray(X, dtype=np.float32) / 255., to_categorical(y, len(list_classes)))
 
 
 # def random_crop_generator(folder):

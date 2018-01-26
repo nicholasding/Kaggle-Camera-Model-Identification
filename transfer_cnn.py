@@ -42,7 +42,7 @@ def build_model_resnet_small_good_LB_782(num_classes, weights_file=None):
     return base_model, model
 
 
-def build_model_resnet_small(num_classes, weights_file=None):
+def build_model_resnet_small_LB_884(num_classes, weights_file=None):
     # Base model from pre-trained network
     base_model = ResNet50(include_top=False, weights='imagenet', pooling='avg')
 
@@ -135,11 +135,11 @@ def lr_schedule(epoch):
     return lr
 
 
-build_model = build_model_resnet_small
+build_model = build_model_resnet_small_LB_884
 
 
 def train_model(base_name=False):
-    epochs = 200
+    epochs = 500
 
     checkpointer = ModelCheckpoint(filepath='saved_models/weights.%s.base.hdf5' % base_name, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
     early_stopping = EarlyStopping(patience=20)
@@ -147,21 +147,14 @@ def train_model(base_name=False):
 
     callbacks_list = [checkpointer, LearningRateScheduler(lr_schedule), early_stopping, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
 
-    base_model, model = build_model(len(list_classes))    
+    base_model, model = build_model(len(list_classes))
     
-    # sgd = SGD(lr=0.002, decay=0.00005, momentum=0.9, nesterov=True)
-    # model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
     model.compile(optimizer=Adam(lr=0.0003), loss='categorical_crossentropy', metrics=['accuracy'])
-
-    # model.summary()
-
-    # Pre-generated Images
-    # train_generator, validation_generator = build_generator(train_folder, BATCH_SIZE, IMAGE_SIZE)
 
     # Dynamic Image Cropping
     train_folder = '/media/nicholas/Data/Resources/Camera/train'
     train_generator = RandomCropSequence(train_folder)
-    validation_generator = build_test_generator('/media/nicholas/Data/Resources/Camera/center_val/train', BATCH_SIZE, IMAGE_SIZE)
+    validation_generator = build_test_generator('/media/nicholas/Data/Resources/Camera/center_val_final_512/train', BATCH_SIZE, IMAGE_SIZE)
 
     model.fit_generator(train_generator,
                         steps_per_epoch=15000 // BATCH_SIZE,
@@ -170,7 +163,7 @@ def train_model(base_name=False):
                         validation_steps=2800 // BATCH_SIZE,
                         callbacks=callbacks_list,
                         use_multiprocessing=True,
-                        workers=6,
+                        workers=4,
                         verbose=1)
 
 
