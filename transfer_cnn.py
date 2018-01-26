@@ -17,7 +17,7 @@ from keras.applications import ResNet50, InceptionV3, Xception, InceptionResNetV
 
 from utils import build_generator, LearningRateHistory, exp_decay, build_test_generator
 from config import BATCH_SIZE, IMAGE_SIZE, list_classes
-from random_crop import random_crop_generator, center_crop, random_crop
+from random_crop import center_crop, random_crop, RandomCropSequence
 
 
 def build_model_resnet_small_good_LB_782(num_classes, weights_file=None):
@@ -28,7 +28,7 @@ def build_model_resnet_small_good_LB_782(num_classes, weights_file=None):
     x = base_model.output
     x = Dense(32, activation='relu')(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.2)(x)
+    x = Dropout(0.5)(x)
 
     outputs = Dense(len(list_classes), activation='softmax')(x)
 
@@ -120,9 +120,6 @@ def build_model_InceptionResNetV2(num_classes, weights_file=None):
     return base_model, model
 
 
-build_model = build_model_resnet_small
-
-
 def lr_schedule(epoch):
     """
     Learning Rate Scheduler for Adam
@@ -138,12 +135,14 @@ def lr_schedule(epoch):
     return lr
 
 
+build_model = build_model_resnet_small
+
+
 def train_model(base_name=False):
-    train_folder = '/media/nicholas/Data/Resources/Camera/merged_patches'
-    epochs = 10000
+    epochs = 200
 
     checkpointer = ModelCheckpoint(filepath='saved_models/weights.%s.base.hdf5' % base_name, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
-    early_stopping = EarlyStopping(patience=500)
+    early_stopping = EarlyStopping(patience=20)
     lr_reducer = ReduceLROnPlateau(factor=0.3, patience=10)
 
     callbacks_list = [checkpointer, LearningRateScheduler(lr_schedule), early_stopping, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
@@ -152,9 +151,7 @@ def train_model(base_name=False):
     
     # sgd = SGD(lr=0.002, decay=0.00005, momentum=0.9, nesterov=True)
     # model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['accuracy'])
-    # model.compile(optimizer=Adagrad(), loss='categorical_crossentropy', metrics=['accuracy'])
     model.compile(optimizer=Adam(lr=0.0003), loss='categorical_crossentropy', metrics=['accuracy'])
-    # model.compile(optimizer=RMSprop(lr=0.045, decay=0.9, epsilon=1.0), loss='categorical_crossentropy', metrics=['accuracy'])
 
     # model.summary()
 
@@ -162,17 +159,18 @@ def train_model(base_name=False):
     # train_generator, validation_generator = build_generator(train_folder, BATCH_SIZE, IMAGE_SIZE)
 
     # Dynamic Image Cropping
-    train_generator = random_crop_generator('/media/nicholas/Data/Resources/Camera/train')
+    train_folder = '/media/nicholas/Data/Resources/Camera/train'
+    train_generator = RandomCropSequence(train_folder)
     validation_generator = build_test_generator('/media/nicholas/Data/Resources/Camera/center_val/train', BATCH_SIZE, IMAGE_SIZE)
 
     model.fit_generator(train_generator,
-                        steps_per_epoch=20000 // BATCH_SIZE,
+                        steps_per_epoch=15000 // BATCH_SIZE,
                         epochs=epochs,
                         validation_data=validation_generator,
-                        validation_steps=2750 // BATCH_SIZE,
+                        validation_steps=2800 // BATCH_SIZE,
                         callbacks=callbacks_list,
-                        # use_multiprocessing=True,
-                        # workers=6,
+                        use_multiprocessing=True,
+                        workers=6,
                         verbose=1)
 
 
@@ -182,10 +180,10 @@ def fine_tune(model, output_file, epochs=200):
     # Unfreeze the n last layers for fine tuning
     for layer in base_model.layers: layer.trainable = True
 
-    model.compile(optimizer=Adam(lr=0.0003), loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=Adam(lr=0.00001), loss='categorical_crossentropy', metrics=['accuracy'])
 
     # Training
-    train_folder = '/media/nicholas/Data/Resources/Camera/train_merged'
+    train_folder = '/media/nicholas/Data/Resources/Camera/train'
 
     checkpointer = ModelCheckpoint(
         filepath=os.path.join(os.path.dirname(__file__), output_file),
@@ -197,19 +195,20 @@ def fine_tune(model, output_file, epochs=200):
     # Callbacks
     early_stopping = EarlyStopping(patience=20)
     lr_reducer = ReduceLROnPlateau(factor=0.3, patience=10)
-    callbacks_list = [checkpointer, LearningRateScheduler(lr_schedule), early_stopping, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
+    callbacks_list = [checkpointer, early_stopping, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
     
-    train_generator = random_crop_generator(train_folder)
-    validation_generator = build_test_generator('/media/nicholas/Data/Resources/Camera/center_merged_val/train', BATCH_SIZE, IMAGE_SIZE)
+    train_generator = RandomCropSequence(train_folder) # random_crop_generator(train_folder)
+    validation_generator = build_test_generator('/media/nicholas/Data/Resources/Camera/center_val_final/train', BATCH_SIZE, IMAGE_SIZE)
 
     model.fit_generator(train_generator,
-                        steps_per_epoch=10000 // BATCH_SIZE,
+                        steps_per_epoch=20000 // BATCH_SIZE,
                         epochs=epochs,
                         validation_data=validation_generator,
-                        validation_steps=2000 // BATCH_SIZE,
+                        validation_steps=5600 // BATCH_SIZE,
                         callbacks=callbacks_list,
                         use_multiprocessing=True, workers=4,
-                        verbose=1)
+                        verbose=1,
+                        initial_epoch=94)
 
 
 def evaluate(model, test_folder):
@@ -263,7 +262,7 @@ def predict(model, average=False):
             img = load_img(os.path.join(test_folder, filename))
             img = center_crop(img, (IMAGE_SIZE, IMAGE_SIZE))
             arr = img_to_array(img) / 255.
-            y_hat = model.predict(np.asarray([arr]))
+            y_hat = model.predict(np.asarray([arr], dtype=np.float32))
             print(filename + "," + list_classes[y_hat[0].argmax()])
 
 

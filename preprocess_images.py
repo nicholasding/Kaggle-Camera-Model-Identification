@@ -6,31 +6,13 @@ import numpy as np
 from multiprocessing import Process
 from PIL import Image
 from keras.preprocessing.image import load_img
-
+from img_utils import resize_crop, random_transformation, center_crop
+from config import IMAGE_SIZE
 
 validation_folder = '/home/nicholas/Workspace/Resources/Camera/validation'
 
 VALIDATION_SPLIT = 0.2
-CROP_SIZE = 224
-
-
-def resize_crop(im, ratio, grid_size=CROP_SIZE):
-    resized = im.resize((int(im.size[0] * ratio), int(im.size[1] * ratio)), Image.BICUBIC)
-
-    center_x = resized.size[0] // 2
-    center_y = resized.size[1] // 2
-
-    return resized.crop((center_x - grid_size // 2, center_y - grid_size // 2, center_x + grid_size // 2, center_y + grid_size // 2))
-
-def gamma_correction(im, gamma):
-    """
-    Fast gamma correction with PIL's image.point() method
-    """
-    invert_gamma = 1.0 / gamma
-    lut = [pow(x/255., invert_gamma) * 255 for x in range(256)]
-    lut = lut * 3 # need one set of data for each band for RGB
-    im = im.point(lut)
-    return im
+CROP_SIZE = IMAGE_SIZE
 
 
 class BasePlan(object):
@@ -105,7 +87,7 @@ class DefaultPlan(BasePlan):
         dirname = os.path.dirname(filepath)
 
         im = Image.open(filepath)
-        im.save(os.path.join(output_folder, '.'.join([name, 'original', ext])), 'JPEG', quality=100)
+        im.save(os.path.join(output_folder, '.'.join([name, 'original', ext])), 'PNG')
 
 
 class CenterPatchPlan(BasePlan):
@@ -127,6 +109,10 @@ class CenterPatchPlan(BasePlan):
         # Original
         ext = 'png'
         centered_im.save(os.path.join(output_folder, '.'.join([name, 'centered', ext])), 'PNG')
+
+        # Transformation
+        transformed_im = center_crop(random_transformation(im), (self.grid_size, self.grid_size))
+        transformed_im.save(os.path.join(output_folder, '.'.join([name, 'centered.manip', ext])), 'PNG')
 
 
 class CenterPatchAugPlan(BasePlan):
@@ -302,8 +288,8 @@ class RandomPatchPlan(BasePlan):
 
 
 if __name__ == '__main__':
-    train_folder = '/media/nicholas/Data/Resources/Camera/train_merged'
-    plan = CenterPatchPlan(train_folder, '/media/nicholas/Data/Resources/Camera/center_merged_val')
+    train_folder = '/media/nicholas/Data/Resources/Camera/train'
+    plan = CenterPatchPlan(train_folder, '/media/nicholas/Data/Resources/Camera/center_val_final')
     # plan = CenterPatchAugPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/center_patch')
     # plan = GridPatchPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/patches')
     # plan = DefaultPlan(train_folder, '/home/nicholas/Workspace/Resources/Camera/default')
