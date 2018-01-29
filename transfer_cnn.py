@@ -20,6 +20,28 @@ from config import BATCH_SIZE, IMAGE_SIZE, list_classes
 from random_crop import center_crop, random_crop, RandomCropSequence
 
 
+def build_model_resnet_small(num_classes, weights_file=None):
+    # Base model from pre-trained network
+    base_model = ResNet50(include_top=False, weights='imagenet', pooling='avg')
+
+    # Connect last layer
+    x = base_model.output
+    # x = Dense(10, activation='relu')(x)
+    # x = BatchNormalization()(x)
+    # x = Dropout(0.5)(x)
+
+    outputs = Dense(len(list_classes), activation='softmax')(x)
+
+    model = Model(inputs=base_model.input, outputs=outputs)
+
+    # Compile the model and freeze the pre-trained layers
+    for layer in base_model.layers: layer.trainable = True
+
+    if weights_file: model.load_weights(weights_file)
+
+    return base_model, model
+
+
 def build_model_resnet_small_good_LB_782(num_classes, weights_file=None):
     # Base model from pre-trained network
     base_model = ResNet50(include_top=False, weights='imagenet', pooling='avg')
@@ -135,7 +157,7 @@ def lr_schedule(epoch):
     return lr
 
 
-build_model = build_model_resnet_small_LB_884
+build_model = build_model_resnet_small
 
 
 def train_model(base_name=False):
@@ -152,22 +174,22 @@ def train_model(base_name=False):
     model.compile(optimizer=Adam(lr=0.0003), loss='categorical_crossentropy', metrics=['accuracy'])
 
     # Dynamic Image Cropping
-    train_folder = '/media/nicholas/Data/Resources/Camera/train'
+    train_folder = '/media/nicholas/Data/Resources/Camera/train_merged'
     train_generator = RandomCropSequence(train_folder)
     validation_generator = build_test_generator('/media/nicholas/Data/Resources/Camera/center_val_final_512/train', BATCH_SIZE, IMAGE_SIZE)
 
     model.fit_generator(train_generator,
-                        steps_per_epoch=15000 // BATCH_SIZE,
+                        steps_per_epoch=20000 // BATCH_SIZE,
                         epochs=epochs,
                         validation_data=validation_generator,
-                        validation_steps=2800 // BATCH_SIZE,
+                        validation_steps=5600 // BATCH_SIZE,
                         callbacks=callbacks_list,
                         use_multiprocessing=True,
                         workers=4,
                         verbose=1)
 
 
-def fine_tune(model, output_file, epochs=500):
+def fine_tune(model, output_file, epochs=1000):
     base_model, model = build_model(len(list_classes), weights_file=model)
 
     # Unfreeze the n last layers for fine tuning
@@ -176,25 +198,27 @@ def fine_tune(model, output_file, epochs=500):
     model.compile(optimizer=Adam(lr=0.0003), loss='categorical_crossentropy', metrics=['accuracy'])
 
     # Training
-    train_folder = '/media/nicholas/Data/Resources/Camera/train'
+    train_folder = '/media/nicholas/Data/Resources/Camera/train_merged'
 
     checkpointer = ModelCheckpoint(
-        filepath=os.path.join(os.path.dirname(__file__), output_file),
-        monitor='val_loss',
+        filepath=os.path.join(os.path.dirname(__file__), output_file + '{epoch:02d}.acc{acc:.2f}.loss{loss:.2f}.val_acc{val_acc:.2f}'),
+        monitor='loss',
         verbose=1,
-        save_best_only=True,
-        mode='min')
+        save_best_only=False,
+        mode='min',
+        save_weights_only=True,
+        period=1)
     
     # Callbacks
     early_stopping = EarlyStopping(patience=99)
     lr_reducer = ReduceLROnPlateau(factor=0.3, patience=10)
-    callbacks_list = [checkpointer, early_stopping, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
+    callbacks_list = [checkpointer, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
     
     train_generator = RandomCropSequence(train_folder) # random_crop_generator(train_folder)
-    validation_generator = build_test_generator('/media/nicholas/Data/Resources/Camera/center_val_final/train', BATCH_SIZE, IMAGE_SIZE)
+    validation_generator = build_test_generator('/media/nicholas/Data/Resources/Camera/center_val_final_512/train', BATCH_SIZE, IMAGE_SIZE)
 
     model.fit_generator(train_generator,
-                        steps_per_epoch=20000 // BATCH_SIZE,
+                        steps_per_epoch=15000 // BATCH_SIZE,
                         epochs=epochs,
                         validation_data=validation_generator,
                         validation_steps=5600 // BATCH_SIZE,

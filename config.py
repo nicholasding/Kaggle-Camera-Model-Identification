@@ -1,4 +1,4 @@
-BATCH_SIZE = 32
+BATCH_SIZE = 48
 IMAGE_SIZE = 224 # for ResNet50
 
 list_classes = [
