@@ -1,24 +1,56 @@
 import os
 import numpy as np
 import random
+import cv2
 
-from io import BytesIO
-from skimage import exposure
-from PIL import Image
 from config import list_classes, BATCH_SIZE, IMAGE_SIZE
 from keras.utils import to_categorical, Sequence
 from keras.preprocessing.image import load_img
 from collections import defaultdict
 from img_utils import random_transformation, random_crop, center_crop
 
-
 PATCHES = BATCH_SIZE
+
+
+class ImageLoadSequence(Sequence):
+    
+    def __init__(self, folder):
+        self.folder = folder
+        self.prepare(folder)
+    
+    def prepare(self, folder):
+        self.files = []
+
+        for clazz in list_classes:
+            self.files.extend([os.path.join(folder, clazz, name) for name in os.listdir(os.path.join(folder, clazz))])
+        
+        print('Found %d samples in %s classes' % (len(self.files), len(list_classes)))
+    
+    def __len__(self):
+        return len(self.files) // BATCH_SIZE
+    
+    def __getitem__(self, idx):
+        samples = np.random.choice(self.files, BATCH_SIZE)
+
+        X, y = [], []
+
+        for sample in samples:
+            im = cv2.imread(sample)
+
+            name = os.path.dirname(sample).split('/')[-1]
+            idx = list_classes.index(name)
+
+            X.append(np.asarray(im, dtype=np.float32))
+            y.append(idx)
+        
+        return (np.asarray(X, dtype=np.float32) / 255., to_categorical(y, len(list_classes)))
 
 
 class RandomCropSequence(Sequence):
 
-    def __init__(self, folder):
+    def __init__(self, folder, length):
         self.folder = folder
+        self.length = length
         self.prepare(folder)
     
     def prepare(self, folder):
@@ -27,12 +59,18 @@ class RandomCropSequence(Sequence):
         for clazz in list_classes:
             self.files[clazz].extend([os.path.join(folder, clazz, name) for name in os.listdir(os.path.join(folder, clazz))])
         
-        self.samples_per_class = 1
+        self.samples_per_class = PATCHES // len(list_classes)
         self.patches_per_image = PATCHES // len(list_classes)
         self.values = list(self.files.values())
+        self.all_files = []
+
+        for i in range(len(list_classes)):
+            self.all_files.extend(self.values[i])
+        
+        print('Found %d samples in %s classes' % (len(self.all_files), len(list_classes)))
     
     def __len__(self):
-        return 10000000
+        return self.length
     
     def __getitem__(self, idx):
         crop_size = IMAGE_SIZE
@@ -40,38 +78,34 @@ class RandomCropSequence(Sequence):
 
         X, y = [], []
 
-        for i in range(num_classes):
-            samples = np.random.choice(self.values[i], self.samples_per_class)
+        # samples = []
 
-            for sample in samples:
-                im = load_img(sample)
+        # for i in range(num_classes):
+        #     samples.extend(np.random.choice(self.values[i], self.samples_per_class))
 
-                name = os.path.dirname(sample).split('/')[-1]
-                idx = list_classes.index(name)
+        # np.random.shuffle(samples)
+        # samples = np.random.choice(samples, PATCHES)
 
-                for i in range(self.patches_per_image):
-                    if np.random.random() < 0.5:
-                        try:
-                            # Make twice as big because of the resize 
-                            crop = random_crop(im, (crop_size * 2.5, crop_size * 2.5))
-                            crop = random_transformation(crop)
-                            crop = center_crop(crop, (crop_size, crop_size))
-                        except Exception as e:
-                            print('Error:', e)
-                            crop = random_crop(im, (crop_size, crop_size))
-                    else:
-                        crop = random_crop(im, (crop_size, crop_size))
-                    
-                    X.append(np.asarray(crop, dtype=np.float32))
-                    y.append(idx)
+        samples = np.random.choice(self.all_files, BATCH_SIZE)
+
+        for sample in samples:
+            im = cv2.imread(sample)
+
+            name = os.path.dirname(sample).split('/')[-1]
+            idx = list_classes.index(name)
+            
+            if np.random.random() < 0.5:
+                # Make twice as big because of the resize 
+                crop = random_crop(im, (crop_size * 3, crop_size * 3))
+                crop = random_transformation(crop)
+                crop = center_crop(crop, (crop_size, crop_size))
+            else:
+                crop = random_crop(im, (crop_size, crop_size))
+
+            X.append(np.asarray(crop, dtype=np.float32))
+            y.append(idx)
         
-        if crop_size > 224:
-            # To overcome GPU memory limit, divide the batch into two
-            for i in range(2):
-                return (np.asarray(X[i*5:(i+1)*5], dtype=np.float32) / 255., to_categorical(y[i*5:(i+1)*5], len(list_classes)))
-        else:
-            return (np.asarray(X, dtype=np.float32) / 255., to_categorical(y, len(list_classes)))
-
+        return (np.asarray(X, dtype=np.float32) / 255., to_categorical(y, len(list_classes)))
 
 # def random_crop_generator(folder):
 #     files = defaultdict(list)

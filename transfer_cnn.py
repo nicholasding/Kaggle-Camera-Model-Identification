@@ -17,18 +17,15 @@ from keras.applications import ResNet50, InceptionV3, Xception, InceptionResNetV
 
 from utils import build_generator, LearningRateHistory, exp_decay, build_test_generator
 from config import BATCH_SIZE, IMAGE_SIZE, list_classes
-from random_crop import center_crop, random_crop, RandomCropSequence
+from random_crop import center_crop, random_crop, RandomCropSequence, ImageLoadSequence
 
 
-def build_model_resnet_small(num_classes, weights_file=None):
+def build_model_resnet_small_LB_890(num_classes, weights_file=None):
     # Base model from pre-trained network
     base_model = ResNet50(include_top=False, weights='imagenet', pooling='avg')
 
     # Connect last layer
     x = base_model.output
-    # x = Dense(10, activation='relu')(x)
-    # x = BatchNormalization()(x)
-    # x = Dropout(0.5)(x)
 
     outputs = Dense(len(list_classes), activation='softmax')(x)
 
@@ -95,12 +92,12 @@ def build_model_resnet(num_classes, weights_file=None):
 
     # Connect last layer
     x = base_model.output
-    x = Dense(1024, activation='relu')(x)
+    x = Dense(512, activation='relu')(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-    x = Dense(1024, activation='relu')(x)
+    x = Dropout(0.3)(x)
+    x = Dense(128, activation='relu')(x)
     x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
+    x = Dropout(0.3)(x)
 
     outputs = Dense(len(list_classes), activation='softmax')(x)
 
@@ -146,9 +143,9 @@ def lr_schedule(epoch):
     """
     Learning Rate Scheduler for Adam
     """
-    lr = 0.0003
+    lr = 0.0001
     if epoch > 7:
-        lr = 0.0001
+        lr = 0.00008
     elif epoch > 9:
         lr = 0.00005
     elif epoch > 11:
@@ -157,35 +154,38 @@ def lr_schedule(epoch):
     return lr
 
 
-build_model = build_model_resnet_small
+build_model = build_model_resnet
 
 
-def train_model(base_name=False):
+def train_model(base_name=False, weights_file=None, initial_epoch=0):
     epochs = 500
 
-    checkpointer = ModelCheckpoint(filepath='saved_models/weights.%s.base.hdf5' % base_name, monitor='val_loss', verbose=1, save_best_only=True, mode='min')
+    checkpointer = ModelCheckpoint(filepath='saved_models/weights.%s.base.hdf5' % base_name, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
     early_stopping = EarlyStopping(patience=99)
-    lr_reducer = ReduceLROnPlateau(factor=0.3, patience=10)
+    lr_reducer = ReduceLROnPlateau(factor=0.3, patience=5, min_lr=1e-10)
 
-    callbacks_list = [checkpointer, LearningRateScheduler(lr_schedule), early_stopping, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
+    callbacks_list = [checkpointer, lr_reducer, early_stopping, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
 
-    base_model, model = build_model(len(list_classes))
+    base_model, model = build_model(len(list_classes), weights_file=weights_file)
     
     model.compile(optimizer=Adam(lr=0.0003), loss='categorical_crossentropy', metrics=['accuracy'])
 
+    train_batches = 10000 // BATCH_SIZE
+
     # Dynamic Image Cropping
-    train_folder = '/media/nicholas/Data/Resources/Camera/train_merged'
-    train_generator = RandomCropSequence(train_folder)
-    validation_generator = build_test_generator('/media/nicholas/Data/Resources/Camera/center_val_final_512/train', BATCH_SIZE, IMAGE_SIZE)
+    train_folder = '/media/nicholas/Data/Resources/Camera/train'
+    validation_folder = '/media/nicholas/Data/Resources/Camera/center_val_final/train'
+    train_generator = RandomCropSequence(train_folder, train_batches)
+    validation_generator = ImageLoadSequence(validation_folder)
 
     model.fit_generator(train_generator,
-                        steps_per_epoch=20000 // BATCH_SIZE,
+                        steps_per_epoch=train_batches,
                         epochs=epochs,
                         validation_data=validation_generator,
-                        validation_steps=5600 // BATCH_SIZE,
+                        validation_steps=2800 // BATCH_SIZE,
                         callbacks=callbacks_list,
                         use_multiprocessing=True,
-                        workers=4,
+                        workers=6,
                         verbose=1)
 
 
@@ -195,37 +195,37 @@ def fine_tune(model, output_file, epochs=1000):
     # Unfreeze the n last layers for fine tuning
     for layer in base_model.layers: layer.trainable = True
 
-    model.compile(optimizer=Adam(lr=0.0003), loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=Adam(lr=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
 
     # Training
     train_folder = '/media/nicholas/Data/Resources/Camera/train_merged'
 
     checkpointer = ModelCheckpoint(
         filepath=os.path.join(os.path.dirname(__file__), output_file + '{epoch:02d}.acc{acc:.2f}.loss{loss:.2f}.val_acc{val_acc:.2f}'),
-        monitor='loss',
+        monitor='val_acc',
         verbose=1,
         save_best_only=False,
-        mode='min',
+        mode='max',
         save_weights_only=True,
         period=1)
     
     # Callbacks
     early_stopping = EarlyStopping(patience=99)
     lr_reducer = ReduceLROnPlateau(factor=0.3, patience=10)
-    callbacks_list = [checkpointer, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
+    callbacks_list = [checkpointer, lr_reducer, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
     
     train_generator = RandomCropSequence(train_folder) # random_crop_generator(train_folder)
-    validation_generator = build_test_generator('/media/nicholas/Data/Resources/Camera/center_val_final_512/train', BATCH_SIZE, IMAGE_SIZE)
+    validation_generator = build_test_generator('/media/nicholas/Data/Resources/Camera/center_val_final/train', BATCH_SIZE, IMAGE_SIZE)
 
     model.fit_generator(train_generator,
                         steps_per_epoch=15000 // BATCH_SIZE,
                         epochs=epochs,
                         validation_data=validation_generator,
-                        validation_steps=5600 // BATCH_SIZE,
+                        validation_steps=2000 // BATCH_SIZE,
                         callbacks=callbacks_list,
                         use_multiprocessing=True, workers=4,
                         verbose=1,
-                        initial_epoch=100)
+                        initial_epoch=133)
 
 
 def evaluate(model, test_folder):
@@ -288,7 +288,8 @@ if __name__ == '__main__':
     if cmd == 'train':
         train_model(base_name='resnet_s')
     elif cmd == 'tune':
-        fine_tune(model='saved_models/weights.finetune.resnet_s.hdf5.LB.884', output_file='saved_models/weights.finetune.resnet_s.hdf5')
+        # fine_tune(model='saved_models/weights.resnet_s.base.hdf5.LB.890', output_file='saved_models/weights.finetune.resnet_s.hdf5')
+        train_model(base_name='resnet_s', weights_file='saved_models/weights.resnet_s.base.hdf5', initial_epoch=20)
     elif cmd == 'predict':
         predict(model=sys.argv[2], average=False)
     elif cmd == 'eval':

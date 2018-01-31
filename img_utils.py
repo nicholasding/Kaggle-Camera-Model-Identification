@@ -1,40 +1,26 @@
 import random
+import cv2
+import numpy as np
 
-from PIL import Image
-from io import BytesIO
-
+# https://mmeysenburg.github.io/image-processing/02-opencv-images/
 
 TRANSFORMATIONS = ['jpeg_70', 'jpeg_90', 'resize_0.5', 'resize_0.8', 'resize_1.5', 'resize_2.0', 'gamma_0.8', 'gamma_1.2']
 
-
-def gamma_correction(im, gamma):
-    """
-    Fast gamma correction with PIL's image.point() method
-    """
-    invert_gamma = 1.0 / gamma
-    lut = [pow(x/255., invert_gamma) * 255 for x in range(256)]
-    lut = lut * 3 # need one set of data for each band for RGB
-    im = im.point(lut)
-    return im
-
-
 def trans_jpeg(img, quality):
-    buffer = BytesIO()
-    img.save(buffer, 'JPEG', quality=int(quality))
-    return Image.open(buffer)
+    """
+    In memory compression. Ref: https://stackoverflow.com/questions/40768621/python-opencv-jpeg-compression-in-memory
+    """
+    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+    result, encoded_img = cv2.imencode('.jpg', img, encode_param)
+    return cv2.imdecode(encoded_img, 1)
 
 
 def trans_resize(img, ratio):
-    w, h = int(img.size[0] * float(ratio)), int(img.size[1] * float(ratio))
-    return img.resize((w, h), Image.BICUBIC)
+    return cv2.resize(img, (0,0), fx=ratio, fy=ratio, interpolation=cv2.INTER_CUBIC)
 
 
 def trans_gamma(img, gamma):
-    try:
-        return gamma_correction(img, float(gamma))
-    except Exception as e:
-        print('Error in gamma correction', e)
-    return img
+    return np.uint8(cv2.pow(img / 255., gamma) * 255.)
 
 
 def random_transformation(img):
@@ -53,36 +39,26 @@ def random_transformation(img):
     action = random.choice(TRANSFORMATIONS)
     op, val = action.split('_')
     if op == 'jpeg':
-        return trans_jpeg(img, val)
+        return trans_jpeg(img, int(val))
     elif op == 'resize':
-        return trans_resize(img, val)
+        return trans_resize(img, float(val))
     else:
-        return trans_gamma(img, val)
+        return trans_gamma(img, float(val))
 
 
 def random_crop(im, random_crop_size, sync_seed=None):
-    w, h = im.size
-    
-    if w <= random_crop_size[0] or h <= random_crop_size[1]:
-        print(w, h, random_crop_size)
+    w, h = im.shape[1], im.shape[0]
     
     rangew = (w - random_crop_size[0])
     rangeh = (h - random_crop_size[1])
+
     offsetw = random.randint(0, rangew)
     offseth = random.randint(0, rangeh)
-    return im.crop((offsetw, offseth, offsetw + random_crop_size[0], offseth + random_crop_size[1]))
+
+    return im[offseth : offseth + random_crop_size[1], offsetw : offsetw + random_crop_size[0]]
 
 
 def center_crop(im, center_crop_size):
-    center_w, center_h = im.size[0] // 2, im.size[1] // 2
+    center_w, center_h = im.shape[1] // 2, im.shape[0] // 2
     half_w, half_h = center_crop_size[0] // 2, center_crop_size[1] // 2
-    return im.crop((center_w - half_w, center_h - half_h, center_w + half_w, center_h + half_h))
-
-
-def resize_crop(im, ratio, grid_size):
-    resized = im.resize((int(im.size[0] * ratio), int(im.size[1] * ratio)), Image.BICUBIC)
-
-    center_x = resized.size[0] // 2
-    center_y = resized.size[1] // 2
-
-    return resized.crop((center_x - grid_size // 2, center_y - grid_size // 2, center_x + grid_size // 2, center_y + grid_size // 2))
+    return im[center_h - half_h : center_h + half_h, center_w - half_w : center_w + half_w]
