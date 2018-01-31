@@ -3,6 +3,7 @@ import numpy as np
 import os
 import sys
 import time
+import cv2
 
 from PIL import Image
 from keras.layers import Dense, Conv2D, BatchNormalization, Activation
@@ -160,17 +161,20 @@ build_model = build_model_resnet
 def train_model(base_name=False, weights_file=None, initial_epoch=0):
     epochs = 500
 
-    checkpointer = ModelCheckpoint(filepath='saved_models/weights.%s.base.hdf5' % base_name, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
-    early_stopping = EarlyStopping(patience=99)
-    lr_reducer = ReduceLROnPlateau(factor=0.3, patience=5, min_lr=1e-10)
+    if weights_file is None:
+        checkpointer = ModelCheckpoint(filepath='saved_models/weights.%s.base.hdf5' % base_name, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+    else:
+        checkpointer = ModelCheckpoint(filepath='saved_models/weights.%s.tune.hdf5' % base_name, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+    early_stopping = EarlyStopping(patience=25)
+    lr_reducer = ReduceLROnPlateau(factor=0.5, patience=5, min_lr=1e-10)
 
     callbacks_list = [checkpointer, lr_reducer, early_stopping, TensorBoard(log_dir='./logs/' + time.strftime('%Y%m%d_%H%M'))]
 
     base_model, model = build_model(len(list_classes), weights_file=weights_file)
     
-    model.compile(optimizer=Adam(lr=0.0003), loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=Adam(lr=0.00001), loss='categorical_crossentropy', metrics=['accuracy'])
 
-    train_batches = 10000 // BATCH_SIZE
+    train_batches = 5000 // BATCH_SIZE
 
     # Dynamic Image Cropping
     train_folder = '/media/nicholas/Data/Resources/Camera/train'
@@ -185,7 +189,8 @@ def train_model(base_name=False, weights_file=None, initial_epoch=0):
                         validation_steps=2800 // BATCH_SIZE,
                         callbacks=callbacks_list,
                         use_multiprocessing=True,
-                        workers=6,
+                        workers=4,
+                        initial_epoch=initial_epoch,
                         verbose=1)
 
 
@@ -276,9 +281,10 @@ def predict(model, average=False):
             y_hat = np.sum(y_hat, axis=0) / 5.
             print(filename + "," + list_classes[y_hat.argmax()])
         else:
-            img = load_img(os.path.join(test_folder, filename))
+            # img = load_img(os.path.join(test_folder, filename))
             # img = center_crop(img, (IMAGE_SIZE, IMAGE_SIZE))
-            arr = img_to_array(img) / 255.
+            img = cv2.imread(os.path.join(test_folder, filename))
+            arr = img / 255.
             y_hat = model.predict(np.asarray([arr], dtype=np.float32))
             print(filename + "," + list_classes[y_hat[0].argmax()])
 
@@ -289,7 +295,7 @@ if __name__ == '__main__':
         train_model(base_name='resnet_s')
     elif cmd == 'tune':
         # fine_tune(model='saved_models/weights.resnet_s.base.hdf5.LB.890', output_file='saved_models/weights.finetune.resnet_s.hdf5')
-        train_model(base_name='resnet_s', weights_file='saved_models/weights.resnet_s.base.hdf5', initial_epoch=20)
+        train_model(base_name='resnet_s', weights_file='saved_models/weights.resnet_s.base.hdf5', initial_epoch=52)
     elif cmd == 'predict':
         predict(model=sys.argv[2], average=False)
     elif cmd == 'eval':

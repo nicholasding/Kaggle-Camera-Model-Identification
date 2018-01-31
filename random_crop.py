@@ -14,8 +14,9 @@ PATCHES = BATCH_SIZE
 
 class ImageLoadSequence(Sequence):
     
-    def __init__(self, folder):
+    def __init__(self, folder, return_manipulated=False):
         self.folder = folder
+        self.return_manipulated = return_manipulated
         self.prepare(folder)
     
     def prepare(self, folder):
@@ -32,7 +33,7 @@ class ImageLoadSequence(Sequence):
     def __getitem__(self, idx):
         samples = np.random.choice(self.files, BATCH_SIZE)
 
-        X, y = [], []
+        X, y, manipulated = [], [], []
 
         for sample in samples:
             im = cv2.imread(sample)
@@ -40,10 +41,18 @@ class ImageLoadSequence(Sequence):
             name = os.path.dirname(sample).split('/')[-1]
             idx = list_classes.index(name)
 
+            if 'manip' in sample:
+                manipulated.append(1.)
+            else:
+                manipulated.append(0.)
+            
             X.append(np.asarray(im, dtype=np.float32))
             y.append(idx)
         
-        return (np.asarray(X, dtype=np.float32) / 255., to_categorical(y, len(list_classes)))
+        if self.return_manipulated:
+            return ([np.asarray(X, dtype=np.float32) / 255., np.asarray(manipulated, dtype=np.float32)], to_categorical(y, len(list_classes)))
+        else:
+            return (np.asarray(X, dtype=np.float32) / 255., to_categorical(y, len(list_classes)))
 
 
 class RandomCropSequence(Sequence):
@@ -107,35 +116,62 @@ class RandomCropSequence(Sequence):
         
         return (np.asarray(X, dtype=np.float32) / 255., to_categorical(y, len(list_classes)))
 
-# def random_crop_generator(folder):
-#     files = defaultdict(list)
-#     for clazz in list_classes:
-#         files[clazz].extend([os.path.join(folder, clazz, name) for name in os.listdir(os.path.join(folder, clazz))])
+
+class RandomCropMergedSequence(Sequence):
     
-#     crop_size = 224
-#     num_classes = len(list_classes)
-#     samples_per_class = 1
-#     patches_per_image = PATCHES // num_classes
-#     values = list(files.values())
+    def __init__(self, folder, length):
+        self.folder = folder
+        self.length = length
+        self.prepare(folder)
+    
+    def prepare(self, folder):
+        self.files = defaultdict(list)
 
-#     while True:
-#         X, y = [], []
-
-#         for i in range(num_classes):
-#             samples = np.random.choice(values[i], samples_per_class)
-
-#             for sample in samples:
-#                 im = load_img(sample)
-                
-#                 # Random transformation on 50% chance
-#                 if np.random.random() < 0.5: im = random_transformation(im)
-
-#                 name = os.path.dirname(sample).split('/')[-1]
-#                 idx = list_classes.index(name)
-
-#                 for i in range(patches_per_image):
-#                     crop = random_crop(im, (crop_size, crop_size))
-#                     X.append(np.asarray(crop, dtype=np.float32))
-#                     y.append(idx)
+        for clazz in list_classes:
+            self.files[clazz].extend([os.path.join(folder, clazz, name) for name in os.listdir(os.path.join(folder, clazz))])
         
-#         yield (np.asarray(X, dtype=np.float32) / 255., to_categorical(y, len(list_classes)))
+        self.samples_per_class = PATCHES // len(list_classes)
+        self.patches_per_image = PATCHES // len(list_classes)
+        self.values = list(self.files.values())
+        self.all_files = []
+
+        for i in range(len(list_classes)):
+            self.all_files.extend(self.values[i])
+        
+        print('Found %d samples in %s classes' % (len(self.all_files), len(list_classes)))
+    
+    def __len__(self):
+        return self.length
+    
+    def __getitem__(self, idx):
+        crop_size = IMAGE_SIZE
+        num_classes = len(list_classes)
+
+        X, y, manipulated = [], [], []
+        samples = np.random.choice(self.all_files, BATCH_SIZE)
+
+        for sample in samples:
+            im = cv2.imread(sample)
+
+            name = os.path.dirname(sample).split('/')[-1]
+            idx = list_classes.index(name)
+            
+            if np.random.random() < 0.5:
+                # Make twice as big because of the resize 
+                crop = random_crop(im, (crop_size * 3, crop_size * 3))
+                crop = random_transformation(crop)
+                crop = center_crop(crop, (crop_size, crop_size))
+                manipulated.append(1.)
+            else:
+                crop = random_crop(im, (crop_size, crop_size))
+                manipulated.append(0.)
+
+            X.append(np.asarray(crop, dtype=np.float32))
+            y.append(idx)
+        
+        return (
+                    # Image & Manipulation (Boolean)
+                    [np.asarray(X, dtype=np.float32) / 255., np.asarray(manipulated, dtype=np.float32)],
+                    # Labels
+                    to_categorical(y, len(list_classes))
+                )
