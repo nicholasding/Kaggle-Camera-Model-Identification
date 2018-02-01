@@ -5,6 +5,9 @@ import sys
 import time
 import cv2
 
+from sklearn.model_selection import train_test_split
+from sklearn.utils import class_weight
+
 from keras.layers import Dense, Conv2D, BatchNormalization
 from keras.layers import AveragePooling2D, Input, Flatten, GlobalAveragePooling2D, GlobalMaxPooling2D, Dropout, concatenate
 from keras.optimizers import Adam, SGD, Adagrad, RMSprop
@@ -17,7 +20,7 @@ from keras.applications import ResNet50, InceptionV3, Xception, InceptionResNetV
 
 from utils import build_generator, LearningRateHistory, exp_decay, build_test_generator
 from config import BATCH_SIZE, IMAGE_SIZE, list_classes
-from random_crop import center_crop, ImageLoadSequence, RandomCropMergedSequence
+from random_crop import center_crop, ImageLoadSequence, RandomCropMergedSequence, CenterCropMergedSequence
 
 
 def build_model(num_classes, weights_file=None):
@@ -62,6 +65,13 @@ def build_model(num_classes, weights_file=None):
     return base_model, model
 
 
+def load_all_files(folder):
+    files = []
+    for clazz in list_classes:
+        files.extend([os.path.join(folder, clazz, name) for name in os.listdir(os.path.join(folder, clazz))])
+    return files
+
+
 def train_model(base_name=False, weights_file=None, initial_epoch=0):
     # Callbacks
     if weights_file is None:
@@ -80,22 +90,35 @@ def train_model(base_name=False, weights_file=None, initial_epoch=0):
     # Training
     epochs = 500
     train_batches = 8000 // BATCH_SIZE
+    validation_batches = 2800 // BATCH_SIZE
 
     # Dynamic Image Cropping
-    train_folder = '/media/nicholas/Data/Resources/Camera/train_merged'
-    validation_folder = '/media/nicholas/Data/Resources/Camera/center_val_final_512/train'
-    train_generator = RandomCropMergedSequence(train_folder, train_batches)
-    validation_generator = ImageLoadSequence(validation_folder, return_manipulated=True)
+    train_folder = '/media/nicholas/Data/Resources/Camera/train'
+    # validation_folder = '/media/nicholas/Data/Resources/Camera/center_val_final_512/train'
+    # train_generator = RandomCropMergedSequence(train_folder, train_batches)
+    # validation_generator = ImageLoadSequence(validation_folder, return_manipulated=True)
+
+    files = load_all_files(train_folder)
+    train_files, validation_files = train_test_split(files, test_size=0.1, random_state=42)
+    print('%d files for training, %d files for validation' % (len(train_files), len(validation_files)))
+
+    train_generator = RandomCropMergedSequence(train_files, train_batches)
+    validation_generator = CenterCropMergedSequence(validation_files, validation_batches)
+
+    # Balance the class weights
+    calculated_weights = class_weight.compute_class_weight('balanced', np.unique(list_classes), [os.path.dirname(name).split('/')[-1] for name in files])
+    print('Weights', calculated_weights)
 
     model.fit_generator(train_generator,
                         steps_per_epoch=train_batches,
                         epochs=epochs,
                         validation_data=validation_generator,
-                        validation_steps=2800 // BATCH_SIZE,
+                        validation_steps=validation_batches,
                         callbacks=callbacks_list,
                         use_multiprocessing=True,
-                        workers=4,
+                        workers=6,
                         initial_epoch=initial_epoch,
+                        class_weight=calculated_weights,
                         verbose=1)
 
 
