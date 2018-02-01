@@ -82,8 +82,8 @@ def train_model(base_name=False, weights_file=None, initial_epoch=0):
     train_batches = 8000 // BATCH_SIZE
 
     # Dynamic Image Cropping
-    train_folder = '/media/nicholas/Data/Resources/Camera/train'
-    validation_folder = '/media/nicholas/Data/Resources/Camera/center_val_final/train'
+    train_folder = '/media/nicholas/Data/Resources/Camera/train_merged'
+    validation_folder = '/media/nicholas/Data/Resources/Camera/center_val_final_512/train'
     train_generator = RandomCropMergedSequence(train_folder, train_batches)
     validation_generator = ImageLoadSequence(validation_folder, return_manipulated=True)
 
@@ -109,38 +109,40 @@ def predict(model, average=False):
 
     for filename in os.listdir(test_folder):
         if average:
-            im = load_img(os.path.join(test_folder, filename))
-            w, h = im.size
-
-            # Cut five patches: four corners and center
-            X = []
+            im = cv2.imread(os.path.join(test_folder, filename))
+            w, h = im.shape[1], im.shape[0]
             
-            # Center
-            crop = center_crop(im, (IMAGE_SIZE, IMAGE_SIZE))
-            X.append(img_to_array(crop) / 255.)
+            # Normalize
+            im = im / 255.
+            manip = np.float32([1. if 'manip' in filename else 0.])
 
-            # Upper-left
-            crop = im.crop((0, 0, IMAGE_SIZE, IMAGE_SIZE))
-            X.append(img_to_array(crop) / 255.)
-            # Upper-right
-            crop = im.crop((w - IMAGE_SIZE, 0, w, IMAGE_SIZE))
-            X.append(img_to_array(crop) / 255.)
-            # Bottom-left
-            crop = im.crop((0, h - IMAGE_SIZE, IMAGE_SIZE, h))
-            X.append(img_to_array(crop) / 255.)
-            # Bottom-right
-            crop = im.crop((w - IMAGE_SIZE, h - IMAGE_SIZE, w, h))
-            X.append(img_to_array(crop) / 255.)
+            sw, sh = w // IMAGE_SIZE, h // IMAGE_SIZE
+            X = np.zeros((sw * sh, IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.float32)
+            m = np.zeros((sw * sh, 1), dtype=np.float32)
+
+            idx = 0
+            for x in range(sw):
+                for y in range(sh):
+                    X[idx] = np.copy(im[y * IMAGE_SIZE : (y+1) * IMAGE_SIZE, x * IMAGE_SIZE : (x+1) * IMAGE_SIZE])
+                    m[idx] = manip
+                    idx += 1
             
-            y_hat = model.predict(np.asarray(X, dtype=np.float32))
-            y_hat = np.sum(y_hat, axis=0) / 5.
+            y_hat = model.predict([X, m])
+            y_hat = np.sum(y_hat, axis=0)
             print(filename + "," + list_classes[y_hat.argmax()])
         else:
-            # img = load_img(os.path.join(test_folder, filename))
-            # img = center_crop(img, (IMAGE_SIZE, IMAGE_SIZE))
+            X, m = [], []
             img = cv2.imread(os.path.join(test_folder, filename))
-            arr = img / 255.
-            y_hat = model.predict(np.asarray([arr], dtype=np.float32))
+            manip = 'manip' in filename
+            if manip:
+                manip = 1.
+            else:
+                manip = 0.
+            
+            X.append(img / 255.)
+            m.append(manip)
+            
+            y_hat = model.predict([np.asarray(X, dtype=np.float32), np.asarray(m, dtype=np.float32)])
             print(filename + "," + list_classes[y_hat[0].argmax()])
 
 
@@ -150,6 +152,6 @@ if __name__ == '__main__':
         train_model(base_name='resnet_m')
     elif cmd == 'tune':
         # fine_tune(model='saved_models/weights.resnet_s.base.hdf5.LB.890', output_file='saved_models/weights.finetune.resnet_s.hdf5')
-        train_model(base_name='resnet_m', weights_file='saved_models/weights.resnet_s.base.hdf5', initial_epoch=52)
+        train_model(base_name='resnet_m', weights_file='saved_models/weights.resnet_m.base.hdf5', initial_epoch=70)
     elif cmd == 'predict':
-        predict(model=sys.argv[2], average=False)
+        predict(model=sys.argv[2], average=True)
