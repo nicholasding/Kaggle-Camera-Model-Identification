@@ -297,6 +297,6 @@ if __name__ == '__main__':
         # fine_tune(model='saved_models/weights.resnet_s.base.hdf5.LB.890', output_file='saved_models/weights.finetune.resnet_s.hdf5')
         train_model(base_name='resnet_s', weights_file='saved_models/weights.resnet_s.base.hdf5', initial_epoch=52)
     elif cmd == 'predict':
-        predict(model=sys.argv[2], average=False)
+        predict(model=sys.argv[2], average=True)
     elif cmd == 'eval':
         evaluate(model=sys.argv[2], test_folder='/media/nicholas/Data/Resources/Camera/random_patch/test')

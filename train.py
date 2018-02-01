@@ -93,7 +93,7 @@ def train_model(base_name=False, weights_file=None, initial_epoch=0):
     validation_batches = 2800 // BATCH_SIZE
 
     # Dynamic Image Cropping
-    train_folder = '/media/nicholas/Data/Resources/Camera/train'
+    train_folder = '/media/nicholas/Data/Resources/Camera/train_merged'
     # validation_folder = '/media/nicholas/Data/Resources/Camera/center_val_final_512/train'
     # train_generator = RandomCropMergedSequence(train_folder, train_batches)
     # validation_generator = ImageLoadSequence(validation_folder, return_manipulated=True)
@@ -116,7 +116,7 @@ def train_model(base_name=False, weights_file=None, initial_epoch=0):
                         validation_steps=validation_batches,
                         callbacks=callbacks_list,
                         use_multiprocessing=True,
-                        workers=6,
+                        workers=4,
                         initial_epoch=initial_epoch,
                         class_weight=calculated_weights,
                         verbose=1)
@@ -175,6 +175,6 @@ if __name__ == '__main__':
         train_model(base_name='resnet_m')
     elif cmd == 'tune':
         # fine_tune(model='saved_models/weights.resnet_s.base.hdf5.LB.890', output_file='saved_models/weights.finetune.resnet_s.hdf5')
-        train_model(base_name='resnet_m', weights_file='saved_models/weights.resnet_m.base.hdf5', initial_epoch=70)
+        train_model(base_name='resnet_m', weights_file='saved_models/weights.resnet_m.base.hdf5', initial_epoch=50)
     elif cmd == 'predict':
         predict(model=sys.argv[2], average=True)

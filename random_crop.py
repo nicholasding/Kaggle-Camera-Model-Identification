@@ -176,13 +176,13 @@ class CenterCropMergedSequence(Sequence):
             name = os.path.dirname(sample).split('/')[-1]
             idx = list_classes.index(name)
             
-            crop = center_crop(im, (IMAGE_SIZE, IMAGE_SIZE))
-
             if np.random.random() < 0.5:
+                crop = center_crop(im, (IMAGE_SIZE * 2, IMAGE_SIZE * 2))
                 crop = random_transformation(crop)
-                crop = center_crop(im, (IMAGE_SIZE, IMAGE_SIZE))
+                crop = center_crop(crop, (IMAGE_SIZE, IMAGE_SIZE))
                 manipulated[i] = np.float32([1.])
             else:
+                crop = center_crop(im, (IMAGE_SIZE, IMAGE_SIZE))
                 manipulated[i] = np.float32([0.])
             
             X[i] = crop
