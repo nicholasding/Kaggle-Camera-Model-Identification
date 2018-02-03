@@ -4,7 +4,13 @@ import numpy as np
 
 # https://mmeysenburg.github.io/image-processing/02-opencv-images/
 
-TRANSFORMATIONS = ['jpeg_70', 'jpeg_90', 'resize_0.5', 'resize_0.8', 'resize_1.5', 'resize_2.0', 'gamma_0.8', 'gamma_1.2']
+TRANSFORMATIONS = [
+    'jpeg_70', 'jpeg_75', 'jpeg_80', 'jpeg_85', 'jpeg_90', 'jpeg_95',
+    'resize_0.5', 'resize_0.65', 'resize_0.8', 'resize_1.2', 'resize_1.35', 'resize_1.5', 'resize_2.0',
+    'gamma_0.8', 'gamma_0.9', 'gamma_1.1', 'gamma_1.2',
+    'flip_h', 'flip_v', 'rot_cw', 'rot_ccw'
+]
+
 
 def trans_jpeg(img, quality):
     """
@@ -21,6 +27,20 @@ def trans_resize(img, ratio):
 
 def trans_gamma(img, gamma):
     return np.uint8(cv2.pow(img / 255., gamma) * 255.)
+
+
+def trans_flip(img, d):
+    if d == 'h': # Horizontal
+        return cv2.flip(img, 0)
+    else: # Vertical
+        return cv2.flip(img, 1)
+
+
+def trans_rot(img, d):
+    if d == 'cw':
+        return cv2.flip(cv2.transpose(img), 1)
+    else:
+        return cv2.flip(cv2.transpose(img), 0)
 
 
 def random_transformation(img):
@@ -42,6 +62,10 @@ def random_transformation(img):
         return trans_jpeg(img, int(val))
     elif op == 'resize':
         return trans_resize(img, float(val))
+    elif op == 'flip':
+        return trans_flip(img, val)
+    elif op == 'rot':
+        return trans_rot(img, val)
     else:
         return trans_gamma(img, float(val))
 

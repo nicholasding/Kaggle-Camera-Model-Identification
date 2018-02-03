@@ -149,25 +149,21 @@ class RandomCropMergedSequence(Sequence):
             X[i] = crop
             y.append(idx)
         
-        return (
-                    # Image & Manipulation (Boolean)
-                    [X / 255., manipulated],
-                    # Labels
-                    to_categorical(y, len(list_classes))
-                )
+        return np.array([[X / 255., manipulated], to_categorical(y, len(list_classes))])
 
 
 class CenterCropMergedSequence(Sequence):
     
-    def __init__(self, files, length):
+    def __init__(self, files, length, crop_size=IMAGE_SIZE):
         self.files = files
         self.length = length
+        self.crop_size = crop_size
     
     def __len__(self):
         return self.length
     
     def __getitem__(self, idx):
-        X, y, manipulated = np.zeros((BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, 3), dtype=np.float32), [], np.zeros((BATCH_SIZE, 1), dtype=np.float32)
+        X, y, manipulated = np.zeros((BATCH_SIZE, self.crop_size, self.crop_size, 3), dtype=np.float32), [], np.zeros((BATCH_SIZE, 1), dtype=np.float32)
         samples = np.random.choice(self.files, BATCH_SIZE)
 
         for i, sample in enumerate(samples):
@@ -177,20 +173,15 @@ class CenterCropMergedSequence(Sequence):
             idx = list_classes.index(name)
             
             if np.random.random() < 0.5:
-                crop = center_crop(im, (IMAGE_SIZE * 2, IMAGE_SIZE * 2))
+                crop = center_crop(im, (self.crop_size * 2, self.crop_size * 2))
                 crop = random_transformation(crop)
-                crop = center_crop(crop, (IMAGE_SIZE, IMAGE_SIZE))
+                crop = center_crop(crop, (self.crop_size, self.crop_size))
                 manipulated[i] = np.float32([1.])
             else:
-                crop = center_crop(im, (IMAGE_SIZE, IMAGE_SIZE))
+                crop = center_crop(im, (self.crop_size, self.crop_size))
                 manipulated[i] = np.float32([0.])
             
             X[i] = crop
             y.append(idx)
         
-        return (
-                    # Image & Manipulation (Boolean)
-                    [X / 255., manipulated],
-                    # Labels
-                    to_categorical(y, len(list_classes))
-                )
+        return np.array([[X / 255., manipulated], to_categorical(y, len(list_classes))])

@@ -85,12 +85,8 @@ def train_model(base_name=False, weights_file=None, initial_epoch=0):
 
     # Model build & compile
     base_model, model = build_model(len(list_classes), weights_file=weights_file)
-    model.compile(optimizer=Adam(lr=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=Adam(lr=0.00001), loss='categorical_crossentropy', metrics=['accuracy'])
 
-    # Training
-    epochs = 500
-    train_batches = 8000 // BATCH_SIZE
-    validation_batches = 2800 // BATCH_SIZE
 
     # Dynamic Image Cropping
     train_folder = '/media/nicholas/Data/Resources/Camera/train_merged'
@@ -99,26 +95,32 @@ def train_model(base_name=False, weights_file=None, initial_epoch=0):
     # validation_generator = ImageLoadSequence(validation_folder, return_manipulated=True)
 
     files = load_all_files(train_folder)
-    train_files, validation_files = train_test_split(files, test_size=0.1, random_state=42)
+    train_files, validation_files = train_test_split(files, test_size=0.15, random_state=42)
     print('%d files for training, %d files for validation' % (len(train_files), len(validation_files)))
 
+    # Training
+    epochs = 500
+    train_batches = 8000 // BATCH_SIZE
+    validation_batches = len(validation_files) // BATCH_SIZE
+
     train_generator = RandomCropMergedSequence(train_files, train_batches)
-    validation_generator = CenterCropMergedSequence(validation_files, validation_batches)
+    validation_generator = CenterCropMergedSequence(validation_files, validation_batches, crop_size=512)
 
     # Balance the class weights
     calculated_weights = class_weight.compute_class_weight('balanced', np.unique(list_classes), [os.path.dirname(name).split('/')[-1] for name in files])
     print('Weights', calculated_weights)
 
     model.fit_generator(train_generator,
-                        steps_per_epoch=train_batches,
+                        # steps_per_epoch=train_batches,
                         epochs=epochs,
                         validation_data=validation_generator,
-                        validation_steps=validation_batches,
+                        # validation_steps=validation_batches,
                         callbacks=callbacks_list,
                         use_multiprocessing=True,
                         workers=4,
                         initial_epoch=initial_epoch,
                         class_weight=calculated_weights,
+                        max_queue_size=6,
                         verbose=1)
 
 
@@ -175,6 +177,6 @@ if __name__ == '__main__':
         train_model(base_name='resnet_m')
     elif cmd == 'tune':
         # fine_tune(model='saved_models/weights.resnet_s.base.hdf5.LB.890', output_file='saved_models/weights.finetune.resnet_s.hdf5')
-        train_model(base_name='resnet_m', weights_file='saved_models/weights.resnet_m.base.hdf5', initial_epoch=50)
+        train_model(base_name='resnet_m', weights_file='saved_models/weights.resnet_m.base.hdf5', initial_epoch=160)
     elif cmd == 'predict':
         predict(model=sys.argv[2], average=True)
