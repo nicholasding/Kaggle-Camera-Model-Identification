@@ -179,4 +179,4 @@ if __name__ == '__main__':
         # fine_tune(model='saved_models/weights.resnet_s.base.hdf5.LB.890', output_file='saved_models/weights.finetune.resnet_s.hdf5')
         train_model(base_name='resnet_m', weights_file='saved_models/weights.resnet_m.base.hdf5', initial_epoch=160)
     elif cmd == 'predict':
-        predict(model=sys.argv[2], average=True)
+        predict(model=sys.argv[2], average=False)
